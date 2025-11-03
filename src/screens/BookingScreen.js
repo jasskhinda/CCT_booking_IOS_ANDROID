@@ -9,8 +9,10 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Calendar } from 'react-native-calendars';
 import AddressAutocomplete from "../components/AddressAutocomplete";
 import { supabase } from '../lib/supabase';
 import { calculateEnhancedTripPrice } from '../lib/enhancedPricing';
@@ -22,6 +24,7 @@ const BookingScreen = ({ navigation }) => {
   const [destinationAddress, setDestinationAddress] = useState('');
   const [pickupDate, setPickupDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [notes, setNotes] = useState('');
 
@@ -33,6 +36,7 @@ const BookingScreen = ({ navigation }) => {
   const [isRoundTrip, setIsRoundTrip] = useState(false);
   const [returnDate, setReturnDate] = useState(new Date());
   const [showReturnDatePicker, setShowReturnDatePicker] = useState(false);
+  const [showReturnCalendar, setShowReturnCalendar] = useState(false);
   const [showReturnTimePicker, setShowReturnTimePicker] = useState(false);
   const [isVeteran, setIsVeteran] = useState(false);
   const [isEmergency, setIsEmergency] = useState(false);
@@ -62,6 +66,14 @@ const BookingScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
+  };
+
+  const handleCalendarDateSelect = (day) => {
+    const selectedDate = new Date(day.dateString);
+    selectedDate.setHours(pickupDate.getHours());
+    selectedDate.setMinutes(pickupDate.getMinutes());
+    setPickupDate(selectedDate);
+    setShowCalendar(false);
   };
 
   const handleDateChange = (event, selectedDate) => {
@@ -94,6 +106,14 @@ const BookingScreen = ({ navigation }) => {
     } else if (event.type === 'dismissed') {
       setShowTimePicker(false);
     }
+  };
+
+  const handleReturnCalendarDateSelect = (day) => {
+    const selectedDate = new Date(day.dateString);
+    selectedDate.setHours(returnDate.getHours());
+    selectedDate.setMinutes(returnDate.getMinutes());
+    setReturnDate(selectedDate);
+    setShowReturnCalendar(false);
   };
 
   const handleReturnDateChange = (event, selectedDate) => {
@@ -264,7 +284,7 @@ const BookingScreen = ({ navigation }) => {
             <View style={styles.dateTimeRow}>
               <TouchableOpacity
                 style={styles.dateTimeButton}
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => setShowCalendar(true)}
               >
                 <Text style={styles.dateTimeIcon}>📅</Text>
                 <Text style={styles.dateTimeText}>
@@ -290,16 +310,6 @@ const BookingScreen = ({ navigation }) => {
                 </Text>
               </TouchableOpacity>
             </View>
-
-            {showDatePicker && (
-              <DateTimePicker
-                value={pickupDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={handleDateChange}
-                minimumDate={new Date()}
-              />
-            )}
 
             {showTimePicker && (
               <DateTimePicker
@@ -333,7 +343,7 @@ const BookingScreen = ({ navigation }) => {
                 <View style={styles.dateTimeRow}>
                   <TouchableOpacity
                     style={styles.dateTimeButton}
-                    onPress={() => setShowReturnDatePicker(true)}
+                    onPress={() => setShowReturnCalendar(true)}
                   >
                     <Text style={styles.dateTimeIcon}>📅</Text>
                     <Text style={styles.dateTimeText}>
@@ -359,16 +369,6 @@ const BookingScreen = ({ navigation }) => {
                     </Text>
                   </TouchableOpacity>
                 </View>
-
-                {showReturnDatePicker && (
-                  <DateTimePicker
-                    value={returnDate}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={handleReturnDateChange}
-                    minimumDate={pickupDate}
-                  />
-                )}
 
                 {showReturnTimePicker && (
                   <DateTimePicker
@@ -488,6 +488,86 @@ const BookingScreen = ({ navigation }) => {
           <View style={styles.bottomSpacer} />
         </View>
       </ScrollView>
+
+      {/* Pickup Date Calendar Modal */}
+      <Modal
+        visible={showCalendar}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCalendar(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.calendarModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Pickup Date</Text>
+              <TouchableOpacity onPress={() => setShowCalendar(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Calendar
+              current={pickupDate.toISOString().split('T')[0]}
+              minDate={new Date().toISOString().split('T')[0]}
+              onDayPress={handleCalendarDateSelect}
+              markedDates={{
+                [pickupDate.toISOString().split('T')[0]]: {
+                  selected: true,
+                  selectedColor: '#5fbfc0',
+                },
+              }}
+              theme={{
+                todayTextColor: '#5fbfc0',
+                selectedDayBackgroundColor: '#5fbfc0',
+                selectedDayTextColor: '#ffffff',
+                arrowColor: '#5fbfc0',
+                monthTextColor: '#333',
+                textDayFontWeight: '500',
+                textMonthFontWeight: 'bold',
+                textDayHeaderFontWeight: '600',
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Return Date Calendar Modal */}
+      <Modal
+        visible={showReturnCalendar}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowReturnCalendar(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.calendarModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Return Date</Text>
+              <TouchableOpacity onPress={() => setShowReturnCalendar(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Calendar
+              current={returnDate.toISOString().split('T')[0]}
+              minDate={pickupDate.toISOString().split('T')[0]}
+              onDayPress={handleReturnCalendarDateSelect}
+              markedDates={{
+                [returnDate.toISOString().split('T')[0]]: {
+                  selected: true,
+                  selectedColor: '#5fbfc0',
+                },
+              }}
+              theme={{
+                todayTextColor: '#5fbfc0',
+                selectedDayBackgroundColor: '#5fbfc0',
+                selectedDayTextColor: '#ffffff',
+                arrowColor: '#5fbfc0',
+                monthTextColor: '#333',
+                textDayFontWeight: '500',
+                textMonthFontWeight: 'bold',
+                textDayHeaderFontWeight: '600',
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -725,6 +805,45 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 40,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  calendarModal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 2,
+    borderBottomColor: '#5fbfc0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalClose: {
+    fontSize: 28,
+    color: '#666',
+    fontWeight: '300',
+    paddingHorizontal: 10,
   },
 });
 
