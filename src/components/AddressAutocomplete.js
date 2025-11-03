@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, FlatList, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TextInput, ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
 
 const AddressAutocomplete = ({ value, onSelectAddress, placeholder, style }) => {
   const [inputValue, setInputValue] = useState(value || '');
@@ -21,15 +21,24 @@ const AddressAutocomplete = ({ value, onSelectAddress, placeholder, style }) => 
         input
       )}&components=country:us&key=${apiKey}`;
 
+      console.log('Fetching predictions for:', input);
       const response = await fetch(url);
       const data = await response.json();
+      console.log('Predictions response:', data);
 
-      if (data.predictions) {
+      if (data.predictions && data.predictions.length > 0) {
         setPredictions(data.predictions);
         setShowPredictions(true);
+      } else if (data.status) {
+        console.log('Google Places API status:', data.status);
+        if (data.error_message) {
+          console.error('Error message:', data.error_message);
+        }
+        setPredictions([]);
       }
     } catch (error) {
       console.error('Error fetching address predictions:', error);
+      setPredictions([]);
     }
   };
 
@@ -54,19 +63,20 @@ const AddressAutocomplete = ({ value, onSelectAddress, placeholder, style }) => 
       />
       {showPredictions && predictions.length > 0 && (
         <View style={styles.predictionsContainer}>
-          <FlatList
-            data={predictions}
-            keyExtractor={(item) => item.place_id}
+          <ScrollView
             keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
+            nestedScrollEnabled={true}
+          >
+            {predictions.map((item) => (
               <TouchableOpacity
+                key={item.place_id}
                 style={styles.predictionItem}
                 onPress={() => handleSelectAddress(item)}
               >
                 <Text style={styles.predictionText}>{item.description}</Text>
               </TouchableOpacity>
-            )}
-          />
+            ))}
+          </ScrollView>
         </View>
       )}
     </View>
