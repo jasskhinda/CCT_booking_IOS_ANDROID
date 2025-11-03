@@ -162,7 +162,14 @@ const ProfileScreen = ({ navigation }) => {
             onChangeText={(text) => setProfile({ ...profile, weight: text })}
             keyboardType="numeric"
           />
-          {profile.weight && parseFloat(profile.weight) >= 300 && (
+          {profile.weight && parseFloat(profile.weight) >= 400 && (
+            <View style={{backgroundColor: '#fee', borderWidth: 2, borderColor: '#f00', borderRadius: 8, padding: 12, marginTop: 8}}>
+              <Text style={{fontSize: 13, color: '#c00', fontWeight: 'bold'}}>
+                🚫 Cannot accommodate rides over 400 lbs - Please contact us for alternative arrangements
+              </Text>
+            </View>
+          )}
+          {profile.weight && parseFloat(profile.weight) >= 300 && parseFloat(profile.weight) < 400 && (
             <Text style={{fontSize: 13, color: '#5fbfc0', fontWeight: '600', marginTop: 5}}>
               ⚠️ Bariatric rate applies ($150 per leg)
             </Text>
