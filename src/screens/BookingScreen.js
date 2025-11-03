@@ -234,6 +234,7 @@ const BookingScreen = ({ navigation }) => {
                 fetchDetails={true}
                 minLength={2}
                 debounce={400}
+                predefinedPlaces={[]}
               />
             </View>
 
@@ -258,6 +259,7 @@ const BookingScreen = ({ navigation }) => {
                 fetchDetails={true}
                 minLength={2}
                 debounce={400}
+                predefinedPlaces={[]}
               />
             </View>
           </View>
