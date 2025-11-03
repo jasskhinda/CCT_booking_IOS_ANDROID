@@ -189,29 +189,35 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.label}>Height *</Text>
           <View style={styles.row}>
             <View style={styles.halfWidth}>
-              <Picker
-                selectedValue={profile.height_feet}
-                onValueChange={(value) => setProfile({ ...profile, height_feet: value })}
-                style={styles.picker}
-              >
-                <Picker.Item label="Feet" value="" />
-                <Picker.Item label="4 ft" value="4" />
-                <Picker.Item label="5 ft" value="5" />
-                <Picker.Item label="6 ft" value="6" />
-                <Picker.Item label="7 ft" value="7" />
-              </Picker>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={profile.height_feet}
+                  onValueChange={(value) => setProfile({ ...profile, height_feet: value })}
+                  style={styles.picker}
+                  itemStyle={{height: 50}}
+                >
+                  <Picker.Item label="Feet" value="" />
+                  <Picker.Item label="4 ft" value="4" />
+                  <Picker.Item label="5 ft" value="5" />
+                  <Picker.Item label="6 ft" value="6" />
+                  <Picker.Item label="7 ft" value="7" />
+                </Picker>
+              </View>
             </View>
             <View style={styles.halfWidth}>
-              <Picker
-                selectedValue={profile.height_inches}
-                onValueChange={(value) => setProfile({ ...profile, height_inches: value })}
-                style={styles.picker}
-              >
-                <Picker.Item label="Inches" value="" />
-                {[...Array(12)].map((_, i) => (
-                  <Picker.Item key={i} label={`${i} in`} value={i.toString()} />
-                ))}
-              </Picker>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={profile.height_inches}
+                  onValueChange={(value) => setProfile({ ...profile, height_inches: value })}
+                  style={styles.picker}
+                  itemStyle={{height: 50}}
+                >
+                  <Picker.Item label="Inches" value="" />
+                  {[...Array(12)].map((_, i) => (
+                    <Picker.Item key={i} label={`${i} in`} value={i.toString()} />
+                  ))}
+                </Picker>
+              </View>
             </View>
           </View>
           <Text style={styles.helperText}>Helps ensure proper vehicle and equipment selection</Text>
@@ -354,6 +360,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
+    height: 50,
+  },
+  pickerContainer: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    height: 50,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   helperText: {
     fontSize: 12,
