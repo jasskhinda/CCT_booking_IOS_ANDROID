@@ -11,12 +11,18 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.log('Session error (expected on first load):', error.message);
+      }
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserProfile(session.user.id);
       }
+      setLoading(false);
+    }).catch((error) => {
+      console.log('Session fetch error:', error);
       setLoading(false);
     });
 

@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   saveButtonDisabled: {
-    backgroundColor: '#99c2ff',
+    backgroundColor: '#a8dfe0',
   },
   saveButtonText: {
     color: '#fff',

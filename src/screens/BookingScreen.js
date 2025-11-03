@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   bookButtonDisabled: {
-    backgroundColor: '#99c2ff',
+    backgroundColor: '#a8dfe0',
   },
   bookButtonText: {
     color: '#fff',
