@@ -7,12 +7,14 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { supabase } from '../lib/supabase';
-import { calculateTripPrice } from '../lib/pricing';
+import { calculateEnhancedTripPrice } from '../lib/enhancedPricing';
+import WheelchairSelection from '../components/WheelchairSelection';
+import PricingDisplay from '../components/PricingDisplay';
 
 const BookingScreen = ({ navigation }) => {
   const [pickupAddress, setPickupAddress] = useState('');
@@ -21,15 +23,24 @@ const BookingScreen = ({ navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [notes, setNotes] = useState('');
-  const [wheelchairNeeded, setWheelchairNeeded] = useState(false);
+
+  // Wheelchair state
+  const [wheelchairType, setWheelchairType] = useState('none');
   const [clientProvidesWheelchair, setClientProvidesWheelchair] = useState(true);
+
+  // Trip options
   const [isRoundTrip, setIsRoundTrip] = useState(false);
   const [returnDate, setReturnDate] = useState(new Date());
   const [showReturnDatePicker, setShowReturnDatePicker] = useState(false);
   const [showReturnTimePicker, setShowReturnTimePicker] = useState(false);
   const [isVeteran, setIsVeteran] = useState(false);
+  const [isEmergency, setIsEmergency] = useState(false);
+
+  // Pricing state
   const [estimatedPrice, setEstimatedPrice] = useState(null);
+  const [calculating, setCalculating] = useState(false);
   const [loading, setLoading] = useState(false);
+
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
@@ -88,34 +99,41 @@ const BookingScreen = ({ navigation }) => {
 
   const calculatePrice = async () => {
     if (!pickupAddress || !destinationAddress) {
-      Alert.alert('Error', 'Please enter both pickup and destination addresses');
+      Alert.alert('Missing Information', 'Please enter both pickup and destination addresses');
       return;
     }
 
+    setCalculating(true);
+
     try {
-      const price = await calculateTripPrice({
+      const price = await calculateEnhancedTripPrice({
         pickupAddress,
         destinationAddress,
         pickupDate,
         isRoundTrip,
-        wheelchairNeeded: wheelchairNeeded && !clientProvidesWheelchair,
+        wheelchairType,
+        clientProvidesWheelchair,
         isVeteran,
+        isEmergency,
       });
+
       setEstimatedPrice(price);
     } catch (error) {
       console.error('Error calculating price:', error);
-      Alert.alert('Error', 'Could not calculate price. Please try again.');
+      Alert.alert('Calculation Error', 'Could not calculate price. Please try again.');
+    } finally {
+      setCalculating(false);
     }
   };
 
   const handleBooking = async () => {
     if (!pickupAddress || !destinationAddress) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      Alert.alert('Missing Information', 'Please fill in all required fields');
       return;
     }
 
     if (!estimatedPrice) {
-      Alert.alert('Error', 'Please calculate the price first');
+      Alert.alert('Price Required', 'Please calculate the price first');
       return;
     }
 
@@ -130,21 +148,25 @@ const BookingScreen = ({ navigation }) => {
         destination_location: destinationAddress,
         pickup_date: pickupDate.toISOString(),
         notes: notes || null,
-        wheelchair_needed: wheelchairNeeded,
+        wheelchair_needed: wheelchairType !== 'none',
+        wheelchair_type: wheelchairType,
         client_provides_wheelchair: clientProvidesWheelchair,
         is_round_trip: isRoundTrip,
         return_date: isRoundTrip ? returnDate.toISOString() : null,
         is_veteran: isVeteran,
+        is_emergency: isEmergency,
         base_price: estimatedPrice.basePrice,
         distance_price: estimatedPrice.distancePrice,
         premiums_total: estimatedPrice.premiumsTotal,
         discount_amount: estimatedPrice.discountAmount,
         final_price: estimatedPrice.finalPrice,
+        distance_miles: estimatedPrice.distance,
+        estimated_duration: estimatedPrice.duration,
         status: 'pending',
         payment_status: 'pending',
       };
 
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('trips')
         .insert([tripData])
         .select()
@@ -153,21 +175,27 @@ const BookingScreen = ({ navigation }) => {
       if (error) throw error;
 
       Alert.alert(
-        'Success',
+        'Success!',
         'Your trip has been booked successfully!',
         [
           {
-            text: 'OK',
+            text: 'View Trips',
+            onPress: () => navigation.navigate('Trips'),
+          },
+          {
+            text: 'Book Another',
             onPress: () => {
-              // Navigate to payment or trips screen
-              navigation.navigate('Trips');
+              setPickupAddress('');
+              setDestinationAddress('');
+              setEstimatedPrice(null);
+              setNotes('');
             },
           },
         ]
       );
     } catch (error) {
       console.error('Error booking trip:', error);
-      Alert.alert('Error', 'Failed to book trip. Please try again.');
+      Alert.alert('Booking Failed', 'Failed to book trip. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -177,235 +205,270 @@ const BookingScreen = ({ navigation }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Book a Ride</Text>
+        <Text style={styles.headerSubtitle}>Compassionate transportation when you need it</Text>
       </View>
 
       <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
         <View style={styles.form}>
-        <Text style={styles.label}>Pickup Location *</Text>
-        <View style={styles.autocompleteContainer}>
-          <GooglePlacesAutocomplete
-            placeholder="Enter pickup address"
-            onPress={(data, details = null) => {
-              setPickupAddress(data.description);
-            }}
-            query={{
-              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-              language: 'en',
-              components: 'country:us',
-            }}
-            styles={{
-              textInput: styles.input,
-              container: { flex: 0 },
-              listView: styles.listView,
-            }}
-            enablePoweredByContainer={false}
-            fetchDetails={true}
-            minLength={2}
-            debounce={400}
-          />
-        </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Trip Details</Text>
 
-        <Text style={styles.label}>Destination *</Text>
-        <View style={styles.autocompleteContainer}>
-          <GooglePlacesAutocomplete
-            placeholder="Enter destination address"
-            onPress={(data, details = null) => {
-              setDestinationAddress(data.description);
-            }}
-            query={{
-              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-              language: 'en',
-              components: 'country:us',
-            }}
-            styles={{
-              textInput: styles.input,
-              container: { flex: 0 },
-              listView: styles.listView,
-            }}
-            enablePoweredByContainer={false}
-            fetchDetails={true}
-            minLength={2}
-            debounce={400}
-          />
-        </View>
-
-        <Text style={styles.label}>Pickup Date & Time *</Text>
-        <View style={styles.dateTimeRow}>
-          <TouchableOpacity
-            style={styles.dateTimeButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.dateTimeText}>
-              {pickupDate.toLocaleDateString()}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.dateTimeButton}
-            onPress={() => setShowTimePicker(true)}
-          >
-            <Text style={styles.dateTimeText}>
-              {pickupDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {showDatePicker && (
-          <DateTimePicker
-            value={pickupDate}
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-            minimumDate={new Date()}
-          />
-        )}
-
-        {showTimePicker && (
-          <DateTimePicker
-            value={pickupDate}
-            mode="time"
-            display="default"
-            onChange={handleTimeChange}
-          />
-        )}
-
-        <View style={styles.checkboxContainer}>
-          <TouchableOpacity
-            style={styles.checkbox}
-            onPress={() => setIsRoundTrip(!isRoundTrip)}
-          >
-            <View style={[styles.checkboxBox, isRoundTrip && styles.checkboxBoxChecked]}>
-              {isRoundTrip && <Text style={styles.checkmark}>✓</Text>}
+            <Text style={styles.label}>Pickup Location *</Text>
+            <View style={styles.autocompleteContainer}>
+              <GooglePlacesAutocomplete
+                placeholder="Enter pickup address"
+                onPress={(data) => {
+                  setPickupAddress(data.description);
+                }}
+                query={{
+                  key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+                  language: 'en',
+                  components: 'country:us',
+                }}
+                styles={{
+                  textInput: styles.input,
+                  container: { flex: 0 },
+                  listView: styles.listView,
+                }}
+                enablePoweredByContainer={false}
+                fetchDetails={true}
+                minLength={2}
+                debounce={400}
+              />
             </View>
-            <Text style={styles.checkboxLabel}>Round Trip</Text>
-          </TouchableOpacity>
-        </View>
 
-        {isRoundTrip && (
-          <>
-            <Text style={styles.label}>Return Date & Time *</Text>
+            <Text style={styles.label}>Destination *</Text>
+            <View style={styles.autocompleteContainer}>
+              <GooglePlacesAutocomplete
+                placeholder="Enter destination address"
+                onPress={(data) => {
+                  setDestinationAddress(data.description);
+                }}
+                query={{
+                  key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+                  language: 'en',
+                  components: 'country:us',
+                }}
+                styles={{
+                  textInput: styles.input,
+                  container: { flex: 0 },
+                  listView: styles.listView,
+                }}
+                enablePoweredByContainer={false}
+                fetchDetails={true}
+                minLength={2}
+                debounce={400}
+              />
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Pickup Date & Time *</Text>
             <View style={styles.dateTimeRow}>
               <TouchableOpacity
                 style={styles.dateTimeButton}
-                onPress={() => setShowReturnDatePicker(true)}
+                onPress={() => setShowDatePicker(true)}
               >
                 <Text style={styles.dateTimeText}>
-                  {returnDate.toLocaleDateString()}
+                  {pickupDate.toLocaleDateString()}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.dateTimeButton}
-                onPress={() => setShowReturnTimePicker(true)}
+                onPress={() => setShowTimePicker(true)}
               >
                 <Text style={styles.dateTimeText}>
-                  {returnDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {pickupDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {showReturnDatePicker && (
+            {showDatePicker && (
               <DateTimePicker
-                value={returnDate}
+                value={pickupDate}
                 mode="date"
                 display="default"
-                onChange={handleReturnDateChange}
-                minimumDate={pickupDate}
+                onChange={handleDateChange}
+                minimumDate={new Date()}
               />
             )}
 
-            {showReturnTimePicker && (
+            {showTimePicker && (
               <DateTimePicker
-                value={returnDate}
+                value={pickupDate}
                 mode="time"
                 display="default"
-                onChange={handleReturnTimeChange}
+                onChange={handleTimeChange}
               />
             )}
-          </>
-        )}
+          </View>
 
-        <View style={styles.checkboxContainer}>
-          <TouchableOpacity
-            style={styles.checkbox}
-            onPress={() => setWheelchairNeeded(!wheelchairNeeded)}
-          >
-            <View style={[styles.checkboxBox, wheelchairNeeded && styles.checkboxBoxChecked]}>
-              {wheelchairNeeded && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={styles.checkboxLabel}>Wheelchair Needed</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Trip Options</Text>
 
-        {wheelchairNeeded && (
-          <View style={styles.checkboxContainer}>
             <TouchableOpacity
-              style={styles.checkbox}
-              onPress={() => setClientProvidesWheelchair(!clientProvidesWheelchair)}
+              style={styles.optionRow}
+              onPress={() => setIsRoundTrip(!isRoundTrip)}
             >
-              <View style={[styles.checkboxBox, clientProvidesWheelchair && styles.checkboxBoxChecked]}>
-                {clientProvidesWheelchair && <Text style={styles.checkmark}>✓</Text>}
+              <View style={styles.checkbox}>
+                {isRoundTrip && <Text style={styles.checkmark}>✓</Text>}
               </View>
-              <Text style={styles.checkboxLabel}>I will provide my own wheelchair</Text>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Round Trip</Text>
+                <Text style={styles.optionDesc}>Book return trip at the same time</Text>
+              </View>
+            </TouchableOpacity>
+
+            {isRoundTrip && (
+              <View style={styles.returnDateSection}>
+                <Text style={styles.label}>Return Date & Time *</Text>
+                <View style={styles.dateTimeRow}>
+                  <TouchableOpacity
+                    style={styles.dateTimeButton}
+                    onPress={() => setShowReturnDatePicker(true)}
+                  >
+                    <Text style={styles.dateTimeText}>
+                      {returnDate.toLocaleDateString()}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.dateTimeButton}
+                    onPress={() => setShowReturnTimePicker(true)}
+                  >
+                    <Text style={styles.dateTimeText}>
+                      {returnDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {showReturnDatePicker && (
+                  <DateTimePicker
+                    value={returnDate}
+                    mode="date"
+                    display="default"
+                    onChange={handleReturnDateChange}
+                    minimumDate={pickupDate}
+                  />
+                )}
+
+                {showReturnTimePicker && (
+                  <DateTimePicker
+                    value={returnDate}
+                    mode="time"
+                    display="default"
+                    onChange={handleReturnTimeChange}
+                  />
+                )}
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.optionRow}
+              onPress={() => setIsEmergency(!isEmergency)}
+            >
+              <View style={styles.checkbox}>
+                {isEmergency && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Emergency Trip (+$40)</Text>
+                <Text style={styles.optionDesc}>Urgent medical appointment</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.optionRow}
+              onPress={() => setIsVeteran(!isVeteran)}
+            >
+              <View style={styles.checkbox}>
+                {isVeteran && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Veteran Discount (20% off)</Text>
+                <Text style={styles.optionDesc}>Available for all veterans</Text>
+              </View>
             </TouchableOpacity>
           </View>
-        )}
 
-        <View style={styles.checkboxContainer}>
-          <TouchableOpacity
-            style={styles.checkbox}
-            onPress={() => setIsVeteran(!isVeteran)}
-          >
-            <View style={[styles.checkboxBox, isVeteran && styles.checkboxBoxChecked]}>
-              {isVeteran && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={styles.checkboxLabel}>I am a veteran (20% discount)</Text>
-          </TouchableOpacity>
-        </View>
+          <WheelchairSelection
+            wheelchairType={wheelchairType}
+            setWheelchairType={setWheelchairType}
+            clientProvidesWheelchair={clientProvidesWheelchair}
+            setClientProvidesWheelchair={setClientProvidesWheelchair}
+          />
 
-        <Text style={styles.label}>Additional Notes</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Any special requirements or notes"
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-          numberOfLines={4}
-        />
-
-        <TouchableOpacity
-          style={styles.calculateButton}
-          onPress={calculatePrice}
-        >
-          <Text style={styles.calculateButtonText}>Calculate Price</Text>
-        </TouchableOpacity>
-
-        {estimatedPrice && (
-          <View style={styles.priceCard}>
-            <Text style={styles.priceTitle}>Estimated Price</Text>
-            <Text style={styles.priceAmount}>${estimatedPrice.finalPrice.toFixed(2)}</Text>
-            <View style={styles.priceBreakdown}>
-              <Text style={styles.priceBreakdownItem}>Base Rate: ${estimatedPrice.basePrice.toFixed(2)}</Text>
-              <Text style={styles.priceBreakdownItem}>Distance: ${estimatedPrice.distancePrice.toFixed(2)}</Text>
-              {estimatedPrice.premiumsTotal > 0 && (
-                <Text style={styles.priceBreakdownItem}>Premiums: ${estimatedPrice.premiumsTotal.toFixed(2)}</Text>
-              )}
-              {estimatedPrice.discountAmount > 0 && (
-                <Text style={styles.priceBreakdownItem}>Discount: -${estimatedPrice.discountAmount.toFixed(2)}</Text>
-              )}
-            </View>
+          <View style={styles.section}>
+            <Text style={styles.label}>Additional Notes</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Any special requirements or instructions"
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={4}
+            />
           </View>
-        )}
 
-        <TouchableOpacity
-          style={[styles.bookButton, loading && styles.bookButtonDisabled]}
-          onPress={handleBooking}
-          disabled={loading || !estimatedPrice}
-        >
-          <Text style={styles.bookButtonText}>
-            {loading ? 'Booking...' : 'Book Trip'}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.calculateButton, calculating && styles.calculateButtonDisabled]}
+            onPress={calculatePrice}
+            disabled={calculating}
+          >
+            {calculating ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.calculateButtonText}>Calculate Estimated Fare</Text>
+            )}
+          </TouchableOpacity>
+
+          {estimatedPrice && <PricingDisplay pricing={estimatedPrice} />}
+
+          {estimatedPrice && (
+            <View style={styles.policySection}>
+              <Text style={styles.policyTitle}>Important Information</Text>
+
+              <View style={styles.policyItem}>
+                <Text style={styles.policyIcon}>💳</Text>
+                <Text style={styles.policyText}>
+                  Payment will be collected after trip completion
+                </Text>
+              </View>
+
+              <View style={styles.policyItem}>
+                <Text style={styles.policyIcon}>🔔</Text>
+                <Text style={styles.policyText}>
+                  You'll receive notifications when a driver is assigned
+                </Text>
+              </View>
+
+              <View style={styles.policyItem}>
+                <Text style={styles.policyIcon}>❌</Text>
+                <Text style={styles.policyText}>
+                  Free cancellation up to 24 hours before pickup
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.bookButton,
+              (loading || !estimatedPrice) && styles.bookButtonDisabled,
+            ]}
+            onPress={handleBooking}
+            disabled={loading || !estimatedPrice}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.bookButtonText}>
+                Confirm Booking • ${estimatedPrice?.finalPrice.toFixed(2) || '0.00'}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.bottomSpacer} />
         </View>
       </ScrollView>
     </View>
@@ -424,14 +487,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#5fbfc0',
     padding: 20,
     paddingTop: 60,
+    paddingBottom: 20,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.9,
   },
   form: {
     padding: 20,
+  },
+  section: {
+    marginBottom: 25,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
   },
   autocompleteContainer: {
     zIndex: 1,
@@ -445,11 +524,11 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   label: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
-    marginTop: 12,
+    marginTop: 10,
   },
   input: {
     backgroundColor: '#fff',
@@ -458,6 +537,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#ddd',
+    marginBottom: 15,
   },
   textArea: {
     height: 100,
@@ -466,6 +546,7 @@ const styles = StyleSheet.create({
   dateTimeRow: {
     flexDirection: 'row',
     gap: 10,
+    marginBottom: 15,
   },
   dateTimeButton: {
     flex: 1,
@@ -474,98 +555,130 @@ const styles = StyleSheet.create({
     padding: 15,
     borderWidth: 1,
     borderColor: '#ddd',
+    alignItems: 'center',
   },
   dateTimeText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#333',
-    textAlign: 'center',
+    fontWeight: '500',
   },
-  checkboxContainer: {
-    marginVertical: 10,
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   checkbox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkboxBox: {
     width: 24,
     height: 24,
-    borderRadius: 4,
+    borderRadius: 6,
     borderWidth: 2,
     borderColor: '#5fbfc0',
-    marginRight: 10,
-    justifyContent: 'center',
+    marginRight: 12,
     alignItems: 'center',
-  },
-  checkboxBoxChecked: {
-    backgroundColor: '#5fbfc0',
+    justifyContent: 'center',
+    marginTop: 2,
   },
   checkmark: {
-    color: '#fff',
+    color: '#5fbfc0',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  checkboxLabel: {
-    fontSize: 16,
+  optionContent: {
+    flex: 1,
+  },
+  optionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
     color: '#333',
+    marginBottom: 3,
+  },
+  optionDesc: {
+    fontSize: 13,
+    color: '#666',
+  },
+  returnDateSection: {
+    marginTop: 10,
+    marginLeft: 36,
+    paddingLeft: 15,
+    borderLeftWidth: 3,
+    borderLeftColor: '#5fbfc0',
   },
   calculateButton: {
     backgroundColor: '#4aa5a6',
-    borderRadius: 8,
-    padding: 15,
+    borderRadius: 12,
+    padding: 18,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  calculateButtonDisabled: {
+    backgroundColor: '#a8dfe0',
   },
   calculateButtonText: {
     color: '#fff',
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  policySection: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 15,
+    marginTop: 20,
+  },
+  policyTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  priceCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginTop: 20,
-    borderWidth: 2,
-    borderColor: '#5fbfc0',
-  },
-  priceTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
     color: '#333',
+    marginBottom: 12,
+  },
+  policyItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: 10,
   },
-  priceAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#5fbfc0',
-    marginBottom: 15,
+  policyIcon: {
+    fontSize: 18,
+    marginRight: 10,
+    marginTop: 1,
   },
-  priceBreakdown: {
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    paddingTop: 15,
-  },
-  priceBreakdownItem: {
+  policyText: {
+    flex: 1,
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    lineHeight: 20,
   },
   bookButton: {
     backgroundColor: '#5fbfc0',
-    borderRadius: 8,
-    padding: 18,
+    borderRadius: 12,
+    padding: 20,
     alignItems: 'center',
     marginTop: 20,
-    marginBottom: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
   },
   bookButtonDisabled: {
     backgroundColor: '#a8dfe0',
+    opacity: 0.6,
   },
   bookButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  bottomSpacer: {
+    height: 40,
   },
 });
 
