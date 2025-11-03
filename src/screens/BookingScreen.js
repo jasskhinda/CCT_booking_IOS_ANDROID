@@ -69,7 +69,9 @@ const BookingScreen = ({ navigation }) => {
   };
 
   const handleCalendarDateSelect = (day) => {
-    const selectedDate = new Date(day.dateString);
+    // Parse date in local timezone to avoid off-by-one errors
+    const [year, month, dayNum] = day.dateString.split('-').map(Number);
+    const selectedDate = new Date(year, month - 1, dayNum);
     selectedDate.setHours(pickupDate.getHours());
     selectedDate.setMinutes(pickupDate.getMinutes());
     setPickupDate(selectedDate);
@@ -109,7 +111,9 @@ const BookingScreen = ({ navigation }) => {
   };
 
   const handleReturnCalendarDateSelect = (day) => {
-    const selectedDate = new Date(day.dateString);
+    // Parse date in local timezone to avoid off-by-one errors
+    const [year, month, dayNum] = day.dateString.split('-').map(Number);
+    const selectedDate = new Date(year, month - 1, dayNum);
     selectedDate.setHours(returnDate.getHours());
     selectedDate.setMinutes(returnDate.getMinutes());
     setReturnDate(selectedDate);
