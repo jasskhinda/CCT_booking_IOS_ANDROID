@@ -40,7 +40,7 @@ const BookingScreen = ({ navigation }) => {
   const [showReturnTimePicker, setShowReturnTimePicker] = useState(false);
   const [isVeteran, setIsVeteran] = useState(false);
   const [isEmergency, setIsEmergency] = useState(false);
-  const [clientWeight, setClientWeight] = useState('250'); // Default 250 lbs
+  const [clientWeight, setClientWeight] = useState('');
 
   // Pricing state
   const [estimatedPrice, setEstimatedPrice] = useState(null);
@@ -63,6 +63,10 @@ const BookingScreen = ({ navigation }) => {
           .eq('id', user.id)
           .single();
         setProfile(data);
+        // Auto-populate weight from profile if available
+        if (data?.weight) {
+          setClientWeight(data.weight.toString());
+        }
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -290,7 +294,10 @@ const BookingScreen = ({ navigation }) => {
               placeholder="Enter destination address"
             />
 
-            <Text style={styles.label}>Client Weight (lbs) *</Text>
+            <Text style={styles.label}>
+              Client Weight (lbs) *
+              {profile?.weight && <Text style={styles.labelNote}> (from profile)</Text>}
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="Enter weight in pounds"
@@ -298,9 +305,16 @@ const BookingScreen = ({ navigation }) => {
               onChangeText={setClientWeight}
               keyboardType="numeric"
             />
-            <Text style={styles.weightNote}>
-              {parseFloat(clientWeight) >= 300 ? '⚠️ Bariatric rate applies ($150 per leg)' : 'Standard rate ($50 per leg)'}
-            </Text>
+            {!clientWeight && (
+              <Text style={styles.infoNote}>
+                💡 Tip: Set your weight in Profile settings to auto-fill this field
+              </Text>
+            )}
+            {clientWeight && (
+              <Text style={styles.weightNote}>
+                {parseFloat(clientWeight) >= 300 ? '⚠️ Bariatric rate applies ($150 per leg)' : 'Standard rate ($50 per leg)'}
+              </Text>
+            )}
           </View>
 
           <View style={styles.section}>
@@ -668,6 +682,18 @@ const styles = StyleSheet.create({
     color: '#444',
     marginBottom: 10,
     marginTop: 5,
+  },
+  labelNote: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#5fbfc0',
+    fontStyle: 'italic',
+  },
+  infoNote: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   input: {
     backgroundColor: '#f8f9fa',

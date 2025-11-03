@@ -19,6 +19,7 @@ const ProfileScreen = ({ navigation }) => {
   const [profile, setProfile] = useState({
     full_name: '',
     phone: '',
+    weight: '',
     address: '',
     city: '',
     state: '',
@@ -43,6 +44,7 @@ const ProfileScreen = ({ navigation }) => {
         setProfile({
           full_name: data.full_name || '',
           phone: data.phone || '',
+          weight: data.weight?.toString() || '',
           address: data.address || '',
           city: data.city || '',
           state: data.state || '',
@@ -72,6 +74,7 @@ const ProfileScreen = ({ navigation }) => {
           id: user.id,
           email: user.email,
           ...profile,
+          weight: profile.weight ? parseFloat(profile.weight) : null,
           updated_at: new Date().toISOString(),
         });
 
@@ -147,6 +150,20 @@ const ProfileScreen = ({ navigation }) => {
             onChangeText={(text) => setProfile({ ...profile, phone: text })}
             keyboardType="phone-pad"
           />
+
+          <Text style={styles.label}>Weight (lbs)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your weight in pounds"
+            value={profile.weight}
+            onChangeText={(text) => setProfile({ ...profile, weight: text })}
+            keyboardType="numeric"
+          />
+          {profile.weight && parseFloat(profile.weight) >= 300 && (
+            <Text style={{fontSize: 13, color: '#5fbfc0', fontWeight: '600', marginTop: 5}}>
+              ⚠️ Bariatric rate applies ($150 per leg)
+            </Text>
+          )}
 
           <Text style={styles.label}>Street Address</Text>
           <TextInput
