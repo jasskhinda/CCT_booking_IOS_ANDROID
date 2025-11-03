@@ -8,9 +8,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -189,35 +187,24 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.label}>Height *</Text>
           <View style={styles.row}>
             <View style={styles.halfWidth}>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={profile.height_feet}
-                  onValueChange={(value) => setProfile({ ...profile, height_feet: value })}
-                  style={styles.picker}
-                  itemStyle={{height: 50}}
-                >
-                  <Picker.Item label="Feet" value="" />
-                  <Picker.Item label="4 ft" value="4" />
-                  <Picker.Item label="5 ft" value="5" />
-                  <Picker.Item label="6 ft" value="6" />
-                  <Picker.Item label="7 ft" value="7" />
-                </Picker>
-              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Feet (4-7)"
+                value={profile.height_feet}
+                onChangeText={(text) => setProfile({ ...profile, height_feet: text })}
+                keyboardType="numeric"
+                maxLength={1}
+              />
             </View>
             <View style={styles.halfWidth}>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={profile.height_inches}
-                  onValueChange={(value) => setProfile({ ...profile, height_inches: value })}
-                  style={styles.picker}
-                  itemStyle={{height: 50}}
-                >
-                  <Picker.Item label="Inches" value="" />
-                  {[...Array(12)].map((_, i) => (
-                    <Picker.Item key={i} label={`${i} in`} value={i.toString()} />
-                  ))}
-                </Picker>
-              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Inches (0-11)"
+                value={profile.height_inches}
+                onChangeText={(text) => setProfile({ ...profile, height_inches: text })}
+                keyboardType="numeric"
+                maxLength={2}
+              />
             </View>
           </View>
           <Text style={styles.helperText}>Helps ensure proper vehicle and equipment selection</Text>
