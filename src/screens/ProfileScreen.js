@@ -8,7 +8,9 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
@@ -20,6 +22,9 @@ const ProfileScreen = ({ navigation }) => {
     full_name: '',
     phone: '',
     weight: '',
+    height_feet: '',
+    height_inches: '',
+    date_of_birth: '',
     address: '',
   });
 
@@ -42,6 +47,9 @@ const ProfileScreen = ({ navigation }) => {
           full_name: data.full_name || '',
           phone: data.phone_number || '', // Map phone_number to phone
           weight: data.weight?.toString() || '',
+          height_feet: data.height_feet?.toString() || '',
+          height_inches: data.height_inches?.toString() || '',
+          date_of_birth: data.date_of_birth || '',
           address: data.address || '',
         });
       }
@@ -67,7 +75,7 @@ const ProfileScreen = ({ navigation }) => {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
 
-      const { error } = await supabase
+      const { error} = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
@@ -77,6 +85,9 @@ const ProfileScreen = ({ navigation }) => {
           // full_name is auto-generated, don't include it
           phone_number: profile.phone, // Map phone to phone_number
           weight: profile.weight ? parseFloat(profile.weight) : null,
+          height_feet: profile.height_feet ? parseInt(profile.height_feet) : null,
+          height_inches: profile.height_inches ? parseInt(profile.height_inches) : null,
+          date_of_birth: profile.date_of_birth || null,
           address: profile.address || null,
           updated_at: new Date().toISOString(),
         });
@@ -174,6 +185,45 @@ const ProfileScreen = ({ navigation }) => {
               ⚠️ Bariatric rate applies ($150 per leg)
             </Text>
           )}
+
+          <Text style={styles.label}>Height *</Text>
+          <View style={styles.row}>
+            <View style={styles.halfWidth}>
+              <Picker
+                selectedValue={profile.height_feet}
+                onValueChange={(value) => setProfile({ ...profile, height_feet: value })}
+                style={styles.picker}
+              >
+                <Picker.Item label="Feet" value="" />
+                <Picker.Item label="4 ft" value="4" />
+                <Picker.Item label="5 ft" value="5" />
+                <Picker.Item label="6 ft" value="6" />
+                <Picker.Item label="7 ft" value="7" />
+              </Picker>
+            </View>
+            <View style={styles.halfWidth}>
+              <Picker
+                selectedValue={profile.height_inches}
+                onValueChange={(value) => setProfile({ ...profile, height_inches: value })}
+                style={styles.picker}
+              >
+                <Picker.Item label="Inches" value="" />
+                {[...Array(12)].map((_, i) => (
+                  <Picker.Item key={i} label={`${i} in`} value={i.toString()} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+          <Text style={styles.helperText}>Helps ensure proper vehicle and equipment selection</Text>
+
+          <Text style={styles.label}>Date of Birth *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="YYYY-MM-DD"
+            value={profile.date_of_birth}
+            onChangeText={(text) => setProfile({ ...profile, date_of_birth: text })}
+          />
+          <Text style={styles.helperText}>Required for hospital record verification when needed</Text>
 
           <Text style={styles.label}>Your Address</Text>
           <TextInput
@@ -298,6 +348,18 @@ const styles = StyleSheet.create({
   },
   halfWidth: {
     flex: 1,
+  },
+  picker: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    marginBottom: 8,
   },
   saveButton: {
     backgroundColor: '#5fbfc0',
