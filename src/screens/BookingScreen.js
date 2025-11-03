@@ -180,20 +180,35 @@ const BookingScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.form}>
+        <View style={styles.infoBox}>
+          <Text style={styles.infoIcon}>📍</Text>
+          <Text style={styles.infoText}>
+            Enter complete addresses including street, city, and state
+          </Text>
+        </View>
+
         <Text style={styles.label}>Pickup Location *</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter pickup address"
+          placeholder="Enter full pickup address (e.g., 123 Main St, Columbus, OH)"
           value={pickupAddress}
           onChangeText={setPickupAddress}
+          multiline
+          numberOfLines={2}
+          autoCapitalize="words"
+          autoCorrect={false}
         />
 
         <Text style={styles.label}>Destination *</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter destination address"
+          placeholder="Enter full destination address"
           value={destinationAddress}
           onChangeText={setDestinationAddress}
+          multiline
+          numberOfLines={2}
+          autoCapitalize="words"
+          autoCorrect={false}
         />
 
         <Text style={styles.label}>Pickup Date & Time *</Text>
@@ -395,6 +410,24 @@ const styles = StyleSheet.create({
   },
   form: {
     padding: 20,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  infoIcon: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1976d2',
+    lineHeight: 20,
   },
   label: {
     fontSize: 16,
