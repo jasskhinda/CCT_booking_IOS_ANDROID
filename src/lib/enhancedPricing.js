@@ -5,17 +5,23 @@
 
 export const PRICING_CONFIG = {
   BASE_RATES: {
-    PER_LEG: 50, // $50 per leg
+    STANDARD: 50, // $50 per leg (under 300 lbs)
+    BARIATRIC: 150, // $150 per leg (300+ lbs)
+  },
+  WEIGHT: {
+    BARIATRIC_THRESHOLD: 300, // 300+ lbs = bariatric
   },
   DISTANCE: {
     FRANKLIN_COUNTY: 3.0, // $3 per mile inside Franklin County
     OUTSIDE_FRANKLIN: 4.0, // $4 per mile outside Franklin County
   },
+  OFFICE_LOCATION: '597 Executive Campus Dr, Westerville, OH 43082, USA',
   PREMIUMS: {
     WEEKEND_AFTER_HOURS: 40, // Before 8am or after 6pm, weekends
     EMERGENCY: 40, // Emergency trip fee
     WHEELCHAIR_RENTAL: 25, // Wheelchair rental fee
-    COUNTY_SURCHARGE: 50, // $50 per county outside Franklin
+    MULTI_COUNTY: 50, // $50 if trip crosses 2+ counties
+    HOLIDAY: 100, // $100 for holidays
   },
   DISCOUNTS: {
     VETERAN: 0.2, // 20% veteran discount
@@ -24,6 +30,12 @@ export const PRICING_CONFIG = {
     AFTER_HOURS_START: 18, // 6pm
     AFTER_HOURS_END: 8, // 8am
   },
+  HOLIDAYS: [
+    '01-01', // New Year's Day
+    '07-04', // Independence Day
+    '12-25', // Christmas
+    '11-28', // Thanksgiving (approximate - 4th Thursday of November)
+  ],
 };
 
 /**
@@ -98,6 +110,32 @@ function isInFranklinCounty(address) {
 }
 
 /**
+ * Count number of counties in trip (simplified - checks if both addresses in Franklin)
+ */
+function countCounties(pickupAddress, destinationAddress) {
+  const pickupInFranklin = isInFranklinCounty(pickupAddress);
+  const destInFranklin = isInFranklinCounty(destinationAddress);
+
+  // If both in Franklin = 1 county
+  // If one outside Franklin = 2+ counties
+  if (pickupInFranklin && destInFranklin) {
+    return 1;
+  }
+  return 2;
+}
+
+/**
+ * Check if date is a holiday
+ */
+function isHoliday(date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateString = `${month}-${day}`;
+
+  return PRICING_CONFIG.HOLIDAYS.includes(dateString);
+}
+
+/**
  * Check if time is after hours
  */
 function isAfterHours(date) {
@@ -132,36 +170,91 @@ export async function calculateEnhancedTripPrice({
   clientProvidesWheelchair = true,
   isVeteran = false,
   isEmergency = false,
+  clientWeight = 250, // Default 250 lbs
 }) {
   try {
-    // Calculate distance and duration
-    const distanceData = await calculateDistance(pickupAddress, destinationAddress);
-    const distance = distanceData.distance;
-    const duration = distanceData.duration;
+    // Calculate main trip distance
+    const tripDistanceData = await calculateDistance(pickupAddress, destinationAddress);
+    const tripDistance = tripDistanceData.distance;
+    const duration = tripDistanceData.duration;
 
-    // Determine if in Franklin County
+    // Determine number of legs
+    const legs = isRoundTrip ? 2 : 1;
+
+    // Determine if bariatric (300+ lbs)
+    const isBariatric = clientWeight >= PRICING_CONFIG.WEIGHT.BARIATRIC_THRESHOLD;
+    const baseRatePerLeg = isBariatric
+      ? PRICING_CONFIG.BASE_RATES.BARIATRIC
+      : PRICING_CONFIG.BASE_RATES.STANDARD;
+    const basePrice = baseRatePerLeg * legs;
+
+    // Determine price per mile
     const inFranklinCounty =
       isInFranklinCounty(pickupAddress) && isInFranklinCounty(destinationAddress);
-
-    // Calculate base price (per leg)
-    const legs = isRoundTrip ? 2 : 1;
-    const basePrice = PRICING_CONFIG.BASE_RATES.PER_LEG * legs;
-
-    // Calculate distance price
     const pricePerMile = inFranklinCounty
       ? PRICING_CONFIG.DISTANCE.FRANKLIN_COUNTY
       : PRICING_CONFIG.DISTANCE.OUTSIDE_FRANKLIN;
-    const distancePrice = distance * pricePerMile * legs;
+
+    // Calculate trip distance price
+    const tripDistancePrice = tripDistance * pricePerMile * legs;
+
+    // Calculate dead mileage
+    let deadMileagePrice = 0;
+    let deadMileageDistance = 0;
+
+    if (isRoundTrip) {
+      // Round trip: Only office→pickup and back
+      const officeToPickup = await calculateDistance(
+        PRICING_CONFIG.OFFICE_LOCATION,
+        pickupAddress
+      );
+      deadMileageDistance = officeToPickup.distance * 2; // Office→Pickup + Pickup→Office
+      deadMileagePrice = deadMileageDistance * pricePerMile;
+    } else {
+      // One-way: Office→Pickup + Destination→Office
+      const officeToPickup = await calculateDistance(
+        PRICING_CONFIG.OFFICE_LOCATION,
+        pickupAddress
+      );
+      const destinationToOffice = await calculateDistance(
+        destinationAddress,
+        PRICING_CONFIG.OFFICE_LOCATION
+      );
+      deadMileageDistance = officeToPickup.distance + destinationToOffice.distance;
+      deadMileagePrice = deadMileageDistance * pricePerMile;
+    }
+
+    // Total distance price (trip + dead mileage)
+    const distancePrice = tripDistancePrice + deadMileagePrice;
 
     // Calculate premiums
     let premiumsTotal = 0;
     const premiumsBreakdown = [];
 
-    // After hours premium
+    // Multi-county surcharge
+    const countyCount = countCounties(pickupAddress, destinationAddress);
+    if (countyCount >= 2) {
+      premiumsTotal += PRICING_CONFIG.PREMIUMS.MULTI_COUNTY;
+      premiumsBreakdown.push({
+        type: 'Multi-County Fee',
+        amount: PRICING_CONFIG.PREMIUMS.MULTI_COUNTY,
+      });
+    }
+
+    // Holiday surcharge
+    if (isHoliday(pickupDate)) {
+      premiumsTotal += PRICING_CONFIG.PREMIUMS.HOLIDAY;
+      premiumsBreakdown.push({
+        type: 'Holiday Surcharge',
+        amount: PRICING_CONFIG.PREMIUMS.HOLIDAY,
+      });
+    }
+
+    // Weekend/After hours premium
     if (isAfterHours(pickupDate)) {
       premiumsTotal += PRICING_CONFIG.PREMIUMS.WEEKEND_AFTER_HOURS;
       premiumsBreakdown.push({
-        type: 'After Hours/Weekend',
+        type: 'Weekend/After Hours',
         amount: PRICING_CONFIG.PREMIUMS.WEEKEND_AFTER_HOURS,
       });
     }
@@ -175,7 +268,7 @@ export async function calculateEnhancedTripPrice({
       });
     }
 
-    // Wheelchair rental premium (only if CCT provides and wheelchair is needed)
+    // Wheelchair rental premium
     if (wheelchairType !== 'none' && !clientProvidesWheelchair) {
       premiumsTotal += PRICING_CONFIG.PREMIUMS.WHEELCHAIR_RENTAL;
       premiumsBreakdown.push({
@@ -198,10 +291,16 @@ export async function calculateEnhancedTripPrice({
 
     return {
       basePrice,
+      baseRatePerLeg,
+      isBariatric,
+      clientWeight,
+      tripDistance,
+      tripDistancePrice,
+      deadMileageDistance,
+      deadMileagePrice,
       distancePrice,
-      distance,
       duration,
-      distanceText: distanceData.distanceText,
+      distanceText: tripDistanceData.distanceText,
       premiumsTotal,
       premiumsBreakdown,
       subtotal,
@@ -210,6 +309,7 @@ export async function calculateEnhancedTripPrice({
       legs,
       inFranklinCounty,
       pricePerMile,
+      countyCount,
     };
   } catch (error) {
     console.error('Error calculating enhanced trip price:', error);

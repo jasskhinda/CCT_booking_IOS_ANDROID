@@ -40,6 +40,7 @@ const BookingScreen = ({ navigation }) => {
   const [showReturnTimePicker, setShowReturnTimePicker] = useState(false);
   const [isVeteran, setIsVeteran] = useState(false);
   const [isEmergency, setIsEmergency] = useState(false);
+  const [clientWeight, setClientWeight] = useState('250'); // Default 250 lbs
 
   // Pricing state
   const [estimatedPrice, setEstimatedPrice] = useState(null);
@@ -158,6 +159,12 @@ const BookingScreen = ({ navigation }) => {
       return;
     }
 
+    const weight = parseFloat(clientWeight) || 250;
+    if (weight < 50 || weight > 1000) {
+      Alert.alert('Invalid Weight', 'Please enter a valid weight between 50 and 1000 lbs');
+      return;
+    }
+
     setCalculating(true);
 
     try {
@@ -170,6 +177,7 @@ const BookingScreen = ({ navigation }) => {
         clientProvidesWheelchair,
         isVeteran,
         isEmergency,
+        clientWeight: weight,
       });
 
       setEstimatedPrice(price);
@@ -281,6 +289,18 @@ const BookingScreen = ({ navigation }) => {
               onSelectAddress={setDestinationAddress}
               placeholder="Enter destination address"
             />
+
+            <Text style={styles.label}>Client Weight (lbs) *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter weight in pounds"
+              value={clientWeight}
+              onChangeText={setClientWeight}
+              keyboardType="numeric"
+            />
+            <Text style={styles.weightNote}>
+              {parseFloat(clientWeight) >= 300 ? '⚠️ Bariatric rate applies ($150 per leg)' : 'Standard rate ($50 per leg)'}
+            </Text>
           </View>
 
           <View style={styles.section}>
@@ -656,12 +676,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1.5,
     borderColor: '#e0e0e0',
-    marginBottom: 15,
+    marginBottom: 8,
     color: '#333',
   },
   textArea: {
     height: 120,
     textAlignVertical: 'top',
+  },
+  weightNote: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 15,
+    fontStyle: 'italic',
   },
   dateTimeRow: {
     flexDirection: 'row',

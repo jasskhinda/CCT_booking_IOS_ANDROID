@@ -11,12 +11,18 @@ const PricingDisplay = ({ pricing }) => {
         <Text style={styles.totalAmount}>${pricing.finalPrice.toFixed(2)}</Text>
       </View>
 
-      {pricing.distance && (
+      {pricing.tripDistance && (
         <View style={styles.infoRow}>
           <Text style={styles.infoIcon}>📏</Text>
           <Text style={styles.infoText}>
-            {pricing.distance.toFixed(1)} miles • {pricing.duration || '~30 min'}
+            Trip: {pricing.tripDistance.toFixed(1)} mi • Dead: {pricing.deadMileageDistance?.toFixed(1) || 0} mi
           </Text>
+        </View>
+      )}
+
+      {pricing.isBariatric && (
+        <View style={styles.bariatricNotice}>
+          <Text style={styles.bariatricText}>⚠️ Bariatric Rate Applied</Text>
         </View>
       )}
 
@@ -26,14 +32,28 @@ const PricingDisplay = ({ pricing }) => {
         <Text style={styles.breakdownTitle}>Price Breakdown</Text>
 
         <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>Base Rate ({pricing.legs} leg{pricing.legs > 1 ? 's' : ''})</Text>
+          <Text style={styles.breakdownLabel}>
+            Base Rate ({pricing.legs} leg{pricing.legs > 1 ? 's' : ''} × ${pricing.baseRatePerLeg})
+            {pricing.isBariatric ? ' - Bariatric' : ''}
+          </Text>
           <Text style={styles.breakdownValue}>${pricing.basePrice.toFixed(2)}</Text>
         </View>
 
         <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>Distance ({pricing.distance?.toFixed(1)} mi)</Text>
-          <Text style={styles.breakdownValue}>${pricing.distancePrice.toFixed(2)}</Text>
+          <Text style={styles.breakdownLabel}>
+            Trip Distance ({pricing.tripDistance?.toFixed(1)} mi × ${pricing.pricePerMile}/mi × {pricing.legs})
+          </Text>
+          <Text style={styles.breakdownValue}>${pricing.tripDistancePrice?.toFixed(2) || '0.00'}</Text>
         </View>
+
+        {pricing.deadMileageDistance > 0 && (
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>
+              Dead Mileage ({pricing.deadMileageDistance?.toFixed(1)} mi × ${pricing.pricePerMile}/mi)
+            </Text>
+            <Text style={styles.breakdownValue}>${pricing.deadMileagePrice?.toFixed(2) || '0.00'}</Text>
+          </View>
+        )}
 
         {pricing.premiumsBreakdown?.map((premium, index) => (
           <View key={index} style={styles.breakdownRow}>
@@ -123,6 +143,18 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     color: '#666',
+  },
+  bariatricNotice: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  bariatricText: {
+    fontSize: 14,
+    color: '#856404',
+    fontWeight: '600',
   },
   divider: {
     height: 1,
