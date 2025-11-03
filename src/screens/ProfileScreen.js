@@ -62,12 +62,19 @@ const ProfileScreen = ({ navigation }) => {
     setSaving(true);
 
     try {
+      // Split full_name into first_name and last_name
+      const nameParts = profile.full_name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       const { error } = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
           email: user.email,
-          full_name: profile.full_name,
+          first_name: firstName,
+          last_name: lastName,
+          // full_name is auto-generated, don't include it
           phone_number: profile.phone, // Map phone to phone_number
           weight: profile.weight ? parseFloat(profile.weight) : null,
           address: profile.address || null,
