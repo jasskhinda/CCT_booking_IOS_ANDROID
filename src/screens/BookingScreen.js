@@ -174,42 +174,60 @@ const BookingScreen = ({ navigation }) => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Book a Ride</Text>
       </View>
 
-      <View style={styles.form}>
-        <View style={styles.infoBox}>
-          <Text style={styles.infoIcon}>📍</Text>
-          <Text style={styles.infoText}>
-            Enter complete addresses including street, city, and state
-          </Text>
+      <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="handled">
+        <View style={styles.form}>
+        <Text style={styles.label}>Pickup Location *</Text>
+        <View style={styles.autocompleteContainer}>
+          <GooglePlacesAutocomplete
+            placeholder="Enter pickup address"
+            onPress={(data, details = null) => {
+              setPickupAddress(data.description);
+            }}
+            query={{
+              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+              language: 'en',
+              components: 'country:us',
+            }}
+            styles={{
+              textInput: styles.input,
+              container: { flex: 0 },
+              listView: styles.listView,
+            }}
+            enablePoweredByContainer={false}
+            fetchDetails={true}
+            minLength={2}
+            debounce={400}
+          />
         </View>
 
-        <Text style={styles.label}>Pickup Location *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter full pickup address (e.g., 123 Main St, Columbus, OH)"
-          value={pickupAddress}
-          onChangeText={setPickupAddress}
-          multiline
-          numberOfLines={2}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-
         <Text style={styles.label}>Destination *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter full destination address"
-          value={destinationAddress}
-          onChangeText={setDestinationAddress}
-          multiline
-          numberOfLines={2}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
+        <View style={styles.autocompleteContainer}>
+          <GooglePlacesAutocomplete
+            placeholder="Enter destination address"
+            onPress={(data, details = null) => {
+              setDestinationAddress(data.description);
+            }}
+            query={{
+              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+              language: 'en',
+              components: 'country:us',
+            }}
+            styles={{
+              textInput: styles.input,
+              container: { flex: 0 },
+              listView: styles.listView,
+            }}
+            enablePoweredByContainer={false}
+            fetchDetails={true}
+            minLength={2}
+            debounce={400}
+          />
+        </View>
 
         <Text style={styles.label}>Pickup Date & Time *</Text>
         <View style={styles.dateTimeRow}>
@@ -388,8 +406,9 @@ const BookingScreen = ({ navigation }) => {
             {loading ? 'Booking...' : 'Book Trip'}
           </Text>
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -397,6 +416,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
   },
   header: {
     backgroundColor: '#5fbfc0',
@@ -411,23 +433,16 @@ const styles = StyleSheet.create({
   form: {
     padding: 20,
   },
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: '#e3f2fd',
+  autocompleteContainer: {
+    zIndex: 1,
+    marginBottom: 15,
+  },
+  listView: {
+    backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  infoIcon: {
-    fontSize: 20,
-    marginRight: 10,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1976d2',
-    lineHeight: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginTop: 5,
   },
   label: {
     fontSize: 16,
