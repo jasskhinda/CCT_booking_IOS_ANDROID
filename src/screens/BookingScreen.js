@@ -235,6 +235,12 @@ const BookingScreen = ({ navigation }) => {
                 minLength={2}
                 debounce={400}
                 predefinedPlaces={[]}
+                textInputProps={{
+                  onFocus: () => {},
+                  onBlur: () => {},
+                  onChangeText: () => {},
+                  clearButtonMode: "never",
+                }}
               />
             </View>
 
