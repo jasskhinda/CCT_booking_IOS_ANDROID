@@ -310,9 +310,21 @@ const BookingScreen = ({ navigation }) => {
                 💡 Tip: Set your weight in Profile settings to auto-fill this field
               </Text>
             )}
-            {clientWeight && (
+            {clientWeight && parseFloat(clientWeight) >= 400 && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>
+                  🚫 Cannot accommodate - Over 400 lbs weight limit
+                </Text>
+              </View>
+            )}
+            {clientWeight && parseFloat(clientWeight) >= 300 && parseFloat(clientWeight) < 400 && (
               <Text style={styles.weightNote}>
-                {parseFloat(clientWeight) >= 300 ? '⚠️ Bariatric rate applies ($150 per leg)' : 'Standard rate ($50 per leg)'}
+                ⚠️ Bariatric rate applies ($150 per leg)
+              </Text>
+            )}
+            {clientWeight && parseFloat(clientWeight) < 300 && (
+              <Text style={styles.weightNote}>
+                Standard rate ($50 per leg)
               </Text>
             )}
           </View>
@@ -506,22 +518,39 @@ const BookingScreen = ({ navigation }) => {
             </View>
           )}
 
-          <TouchableOpacity
-            style={[
-              styles.bookButton,
-              (loading || !estimatedPrice) && styles.bookButtonDisabled,
-            ]}
-            onPress={handleBooking}
-            disabled={loading || !estimatedPrice}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.bookButtonText}>
-                Confirm Booking • ${estimatedPrice?.finalPrice.toFixed(2) || '0.00'}
+          {clientWeight && parseFloat(clientWeight) >= 400 ? (
+            <TouchableOpacity
+              style={styles.contactButton}
+              onPress={() => {
+                Alert.alert(
+                  'Cannot Accommodate',
+                  'For clients over 400 lbs, please contact our support team directly at support@cct.com or call us to discuss specialized transportation options.',
+                  [{ text: 'OK' }]
+                );
+              }}
+            >
+              <Text style={styles.contactButtonText}>
+                Cannot Book - Contact Us
               </Text>
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.bookButton,
+                (loading || !estimatedPrice) && styles.bookButtonDisabled,
+              ]}
+              onPress={handleBooking}
+              disabled={loading || !estimatedPrice}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.bookButtonText}>
+                  Confirm Booking • ${estimatedPrice?.finalPrice.toFixed(2) || '0.00'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
 
           <View style={styles.bottomSpacer} />
         </View>
@@ -715,6 +744,19 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontStyle: 'italic',
   },
+  errorBox: {
+    backgroundColor: '#fee',
+    borderWidth: 2,
+    borderColor: '#f00',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 15,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#c00',
+    fontWeight: 'bold',
+  },
   dateTimeRow: {
     flexDirection: 'row',
     gap: 10,
@@ -855,6 +897,23 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   bookButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  contactButton: {
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  contactButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
