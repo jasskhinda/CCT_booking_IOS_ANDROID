@@ -21,9 +21,6 @@ const ProfileScreen = ({ navigation }) => {
     phone: '',
     weight: '',
     address: '',
-    city: '',
-    state: '',
-    zip_code: '',
   });
 
   useEffect(() => {
@@ -46,9 +43,6 @@ const ProfileScreen = ({ navigation }) => {
           phone: data.phone || '',
           weight: data.weight?.toString() || '',
           address: data.address || '',
-          city: data.city || '',
-          state: data.state || '',
-          zip_code: data.zip_code || '',
         });
       }
     } catch (error) {
@@ -165,47 +159,14 @@ const ProfileScreen = ({ navigation }) => {
             </Text>
           )}
 
-          <Text style={styles.label}>Street Address</Text>
+          <Text style={styles.label}>Your Address</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter your street address"
+            placeholder="Enter your full address"
             value={profile.address}
             onChangeText={(text) => setProfile({ ...profile, address: text })}
+            multiline
           />
-
-          <Text style={styles.label}>City</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your city"
-            value={profile.city}
-            onChangeText={(text) => setProfile({ ...profile, city: text })}
-          />
-
-          <View style={styles.row}>
-            <View style={styles.halfWidth}>
-              <Text style={styles.label}>State</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="State"
-                value={profile.state}
-                onChangeText={(text) => setProfile({ ...profile, state: text })}
-                maxLength={2}
-                autoCapitalize="characters"
-              />
-            </View>
-
-            <View style={styles.halfWidth}>
-              <Text style={styles.label}>ZIP Code</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="ZIP"
-                value={profile.zip_code}
-                onChangeText={(text) => setProfile({ ...profile, zip_code: text })}
-                keyboardType="numeric"
-                maxLength={5}
-              />
-            </View>
-          </View>
 
           <TouchableOpacity
             style={[styles.saveButton, saving && styles.saveButtonDisabled]}
