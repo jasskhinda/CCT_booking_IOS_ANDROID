@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AddressAutocomplete from "../components/AddressAutocomplete";
@@ -64,36 +65,66 @@ const BookingScreen = ({ navigation }) => {
   };
 
   const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setPickupDate(selectedDate);
+    const currentDate = selectedDate || pickupDate;
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (event.type === 'set') {
+      setPickupDate(currentDate);
+      if (Platform.OS === 'android') {
+        setShowDatePicker(false);
+      }
+    } else if (event.type === 'dismissed') {
+      setShowDatePicker(false);
     }
   };
 
   const handleTimeChange = (event, selectedTime) => {
-    setShowTimePicker(false);
-    if (selectedTime) {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (event.type === 'set' && selectedTime) {
       const newDate = new Date(pickupDate);
       newDate.setHours(selectedTime.getHours());
       newDate.setMinutes(selectedTime.getMinutes());
       setPickupDate(newDate);
+      if (Platform.OS === 'android') {
+        setShowTimePicker(false);
+      }
+    } else if (event.type === 'dismissed') {
+      setShowTimePicker(false);
     }
   };
 
   const handleReturnDateChange = (event, selectedDate) => {
-    setShowReturnDatePicker(false);
-    if (selectedDate) {
-      setReturnDate(selectedDate);
+    const currentDate = selectedDate || returnDate;
+    if (Platform.OS === 'android') {
+      setShowReturnDatePicker(false);
+    }
+    if (event.type === 'set') {
+      setReturnDate(currentDate);
+      if (Platform.OS === 'android') {
+        setShowReturnDatePicker(false);
+      }
+    } else if (event.type === 'dismissed') {
+      setShowReturnDatePicker(false);
     }
   };
 
   const handleReturnTimeChange = (event, selectedTime) => {
-    setShowReturnTimePicker(false);
-    if (selectedTime) {
+    if (Platform.OS === 'android') {
+      setShowReturnTimePicker(false);
+    }
+    if (event.type === 'set' && selectedTime) {
       const newDate = new Date(returnDate);
       newDate.setHours(selectedTime.getHours());
       newDate.setMinutes(selectedTime.getMinutes());
       setReturnDate(newDate);
+      if (Platform.OS === 'android') {
+        setShowReturnTimePicker(false);
+      }
+    } else if (event.type === 'dismissed') {
+      setShowReturnTimePicker(false);
     }
   };
 
@@ -235,8 +266,13 @@ const BookingScreen = ({ navigation }) => {
                 style={styles.dateTimeButton}
                 onPress={() => setShowDatePicker(true)}
               >
+                <Text style={styles.dateTimeIcon}>📅</Text>
                 <Text style={styles.dateTimeText}>
-                  {pickupDate.toLocaleDateString()}
+                  {pickupDate.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
                 </Text>
               </TouchableOpacity>
 
@@ -244,8 +280,13 @@ const BookingScreen = ({ navigation }) => {
                 style={styles.dateTimeButton}
                 onPress={() => setShowTimePicker(true)}
               >
+                <Text style={styles.dateTimeIcon}>🕐</Text>
                 <Text style={styles.dateTimeText}>
-                  {pickupDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {pickupDate.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -254,7 +295,7 @@ const BookingScreen = ({ navigation }) => {
               <DateTimePicker
                 value={pickupDate}
                 mode="date"
-                display="default"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={handleDateChange}
                 minimumDate={new Date()}
               />
@@ -264,7 +305,7 @@ const BookingScreen = ({ navigation }) => {
               <DateTimePicker
                 value={pickupDate}
                 mode="time"
-                display="default"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={handleTimeChange}
               />
             )}
@@ -294,8 +335,13 @@ const BookingScreen = ({ navigation }) => {
                     style={styles.dateTimeButton}
                     onPress={() => setShowReturnDatePicker(true)}
                   >
+                    <Text style={styles.dateTimeIcon}>📅</Text>
                     <Text style={styles.dateTimeText}>
-                      {returnDate.toLocaleDateString()}
+                      {returnDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
                     </Text>
                   </TouchableOpacity>
 
@@ -303,8 +349,13 @@ const BookingScreen = ({ navigation }) => {
                     style={styles.dateTimeButton}
                     onPress={() => setShowReturnTimePicker(true)}
                   >
+                    <Text style={styles.dateTimeIcon}>🕐</Text>
                     <Text style={styles.dateTimeText}>
-                      {returnDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {returnDate.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -313,7 +364,7 @@ const BookingScreen = ({ navigation }) => {
                   <DateTimePicker
                     value={returnDate}
                     mode="date"
-                    display="default"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                     onChange={handleReturnDateChange}
                     minimumDate={pickupDate}
                   />
@@ -323,7 +374,7 @@ const BookingScreen = ({ navigation }) => {
                   <DateTimePicker
                     value={returnDate}
                     mode="time"
-                    display="default"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                     onChange={handleReturnTimeChange}
                   />
                 )}
@@ -453,30 +504,48 @@ const styles = StyleSheet.create({
     backgroundColor: '#5fbfc0',
     padding: 20,
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 4,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 5,
+    marginBottom: 8,
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#fff',
-    opacity: 0.9,
+    opacity: 0.95,
+    fontWeight: '400',
   },
   form: {
-    padding: 20,
+    padding: 15,
   },
   section: {
-    marginBottom: 25,
+    marginBottom: 30,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 15,
+    marginBottom: 18,
+    borderBottomWidth: 2,
+    borderBottomColor: '#5fbfc0',
+    paddingBottom: 10,
   },
   autocompleteContainer: {
     zIndex: 1,
@@ -490,23 +559,24 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   label: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    marginTop: 10,
+    color: '#444',
+    marginBottom: 10,
+    marginTop: 5,
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 15,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    padding: 16,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
     marginBottom: 15,
+    color: '#333',
   },
   textArea: {
-    height: 100,
+    height: 120,
     textAlignVertical: 'top',
   },
   dateTimeRow: {
@@ -516,17 +586,27 @@ const styles = StyleSheet.create({
   },
   dateTimeButton: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
     padding: 15,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  dateTimeIcon: {
+    fontSize: 20,
+    marginBottom: 5,
   },
   dateTimeText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#333',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   optionRow: {
     flexDirection: 'row',
