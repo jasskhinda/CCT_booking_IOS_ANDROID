@@ -40,7 +40,7 @@ const ProfileScreen = ({ navigation }) => {
       if (data) {
         setProfile({
           full_name: data.full_name || '',
-          phone: data.phone || '',
+          phone: data.phone_number || '', // Map phone_number to phone
           weight: data.weight?.toString() || '',
           address: data.address || '',
         });
@@ -67,8 +67,10 @@ const ProfileScreen = ({ navigation }) => {
         .upsert({
           id: user.id,
           email: user.email,
-          ...profile,
+          full_name: profile.full_name,
+          phone_number: profile.phone, // Map phone to phone_number
           weight: profile.weight ? parseFloat(profile.weight) : null,
+          address: profile.address || null,
           updated_at: new Date().toISOString(),
         });
 
