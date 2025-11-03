@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import AddressAutocomplete from "../components/AddressAutocomplete";
 import { supabase } from '../lib/supabase';
 import { calculateEnhancedTripPrice } from '../lib/enhancedPricing';
 import WheelchairSelection from '../components/WheelchairSelection';
@@ -214,60 +214,18 @@ const BookingScreen = ({ navigation }) => {
             <Text style={styles.sectionTitle}>Trip Details</Text>
 
             <Text style={styles.label}>Pickup Location *</Text>
-            <View style={styles.autocompleteContainer}>
-              <GooglePlacesAutocomplete
-                placeholder="Enter pickup address"
-                onPress={(data) => {
-                  setPickupAddress(data.description);
-                }}
-                query={{
-                  key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-                  language: 'en',
-                  components: 'country:us',
-                }}
-                styles={{
-                  textInput: styles.input,
-                  container: { flex: 0 },
-                  listView: styles.listView,
-                }}
-                enablePoweredByContainer={false}
-                fetchDetails={true}
-                minLength={2}
-                debounce={400}
-                predefinedPlaces={[]}
-                textInputProps={{
-                  onFocus: () => {},
-                  onBlur: () => {},
-                  onChangeText: () => {},
-                  clearButtonMode: "never",
-                }}
-              />
-            </View>
+            <AddressAutocomplete
+              value={pickupAddress}
+              onSelectAddress={setPickupAddress}
+              placeholder="Enter pickup address"
+            />
 
             <Text style={styles.label}>Destination *</Text>
-            <View style={styles.autocompleteContainer}>
-              <GooglePlacesAutocomplete
-                placeholder="Enter destination address"
-                onPress={(data) => {
-                  setDestinationAddress(data.description);
-                }}
-                query={{
-                  key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-                  language: 'en',
-                  components: 'country:us',
-                }}
-                styles={{
-                  textInput: styles.input,
-                  container: { flex: 0 },
-                  listView: styles.listView,
-                }}
-                enablePoweredByContainer={false}
-                fetchDetails={true}
-                minLength={2}
-                debounce={400}
-                predefinedPlaces={[]}
-              />
-            </View>
+            <AddressAutocomplete
+              value={destinationAddress}
+              onSelectAddress={setDestinationAddress}
+              placeholder="Enter destination address"
+            />
           </View>
 
           <View style={styles.section}>
