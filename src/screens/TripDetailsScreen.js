@@ -44,15 +44,7 @@ const TripDetailsScreen = ({ route, navigation }) => {
     try {
       const { data, error } = await supabase
         .from('trips')
-        .select(`
-          *,
-          driver:driver_id (
-            id,
-            full_name,
-            phone,
-            email
-          )
-        `)
+        .select('*')
         .eq('id', tripId)
         .single();
 
@@ -147,7 +139,7 @@ const TripDetailsScreen = ({ route, navigation }) => {
     );
   }
 
-  const pickupDate = new Date(trip.pickup_date);
+  const pickupDate = new Date(trip.pickup_time);
   const statusColor = getStatusColor(trip.status);
 
   return (
@@ -183,73 +175,55 @@ const TripDetailsScreen = ({ route, navigation }) => {
             <Text style={styles.locationIcon}>📍</Text>
             <View style={styles.locationDetails}>
               <Text style={styles.locationLabel}>Pickup</Text>
-              <Text style={styles.locationAddress}>{trip.pickup_location}</Text>
+              <Text style={styles.locationAddress}>{trip.pickup_address}</Text>
             </View>
           </View>
           <View style={styles.locationCard}>
             <Text style={styles.locationIcon}>🎯</Text>
             <View style={styles.locationDetails}>
               <Text style={styles.locationLabel}>Destination</Text>
-              <Text style={styles.locationAddress}>{trip.destination_location}</Text>
+              <Text style={styles.locationAddress}>{trip.destination_address}</Text>
             </View>
           </View>
         </View>
 
-        {trip.driver && (
+        {trip.driver_name && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Driver Information</Text>
             <View style={styles.driverCard}>
               <View style={styles.driverAvatar}>
                 <Text style={styles.driverAvatarText}>
-                  {trip.driver.full_name?.charAt(0) || 'D'}
+                  {trip.driver_name?.charAt(0) || 'D'}
                 </Text>
               </View>
               <View style={styles.driverDetails}>
-                <Text style={styles.driverName}>{trip.driver.full_name}</Text>
-                <Text style={styles.driverContact}>{trip.driver.phone}</Text>
+                <Text style={styles.driverName}>{trip.driver_name}</Text>
+                {trip.vehicle && <Text style={styles.driverContact}>{trip.vehicle}</Text>}
               </View>
             </View>
           </View>
         )}
 
-        {trip.notes && (
+        {trip.special_requirements && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Additional Notes</Text>
-            <Text style={styles.notesText}>{trip.notes}</Text>
+            <Text style={styles.notesText}>{trip.special_requirements}</Text>
           </View>
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pricing Breakdown</Text>
+          <Text style={styles.sectionTitle}>Trip Information</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Base Price:</Text>
-            <Text style={styles.priceValue}>${trip.base_price?.toFixed(2) || '0.00'}</Text>
+            <Text style={styles.priceLabel}>Distance:</Text>
+            <Text style={styles.priceValue}>{trip.distance?.toFixed(1) || '0.0'} miles</Text>
           </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Distance Charge:</Text>
-            <Text style={styles.priceValue}>${trip.distance_price?.toFixed(2) || '0.00'}</Text>
-          </View>
-          {trip.premiums_total > 0 && (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Premiums:</Text>
-              <Text style={styles.priceValue}>${trip.premiums_total?.toFixed(2)}</Text>
-            </View>
-          )}
-          {trip.discount_amount > 0 && (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Discount:</Text>
-              <Text style={[styles.priceValue, styles.discountText]}>
-                -${trip.discount_amount?.toFixed(2)}
-              </Text>
-            </View>
-          )}
           <View style={[styles.priceRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total:</Text>
-            <Text style={styles.totalValue}>${trip.final_price?.toFixed(2) || '0.00'}</Text>
+            <Text style={styles.totalLabel}>Total Price:</Text>
+            <Text style={styles.totalValue}>${trip.price?.toFixed(2) || '0.00'}</Text>
           </View>
         </View>
 
-        {trip.wheelchair_needed && (
+        {trip.wheelchair_type && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Special Requirements</Text>
             <View style={styles.requirementItem}>

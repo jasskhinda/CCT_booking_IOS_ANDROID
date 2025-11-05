@@ -45,7 +45,7 @@ const HomeScreen = ({ navigation }) => {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.title}>CCT Booking</Text>
+        <Text style={styles.title}>Booking</Text>
       </View>
 
       <View style={styles.welcomeCard}>
