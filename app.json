@@ -16,6 +16,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cct.booking",
+      "buildNumber": "1",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      },
       "config": {
         "googleMapsApiKey": "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY"
       }
@@ -28,18 +34,35 @@
       "package": "com.cct.booking",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "NOTIFICATIONS",
+        "POST_NOTIFICATIONS"
       ],
       "config": {
         "googleMaps": {
           "apiKey": "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY"
         }
+      },
+      "notification": {
+        "icon": "./assets/notification.png",
+        "color": "#5fbfc0"
       }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [],
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification.png",
+          "color": "#5fbfc0",
+          "sounds": ["./assets/notification-sound.wav"]
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "your-project-id"

@@ -11,9 +11,13 @@ import SignUpScreen from '../screens/SignUpScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import HomeScreen from '../screens/HomeScreen';
 import BookingScreen from '../screens/BookingScreen';
+import UberLikeBookingScreen from '../screens/UberLikeBookingScreen'; // New enhanced booking screen
 import TripsScreen from '../screens/TripsScreen';
 import TripDetailsScreen from '../screens/TripDetailsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
+import AddPaymentMethodScreen from '../screens/AddPaymentMethodScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -44,7 +48,7 @@ const HomeTabs = () => (
     />
     <Tab.Screen
       name="Book"
-      component={BookingScreen}
+      component={UberLikeBookingScreen}
       options={{
         tabBarLabel: 'Book',
         tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>📅</Text>,
@@ -79,7 +83,22 @@ const AppStack = () => (
     <Stack.Screen
       name="TripDetails"
       component={TripDetailsScreen}
-      options={{ title: 'Trip Details' }}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="PaymentMethods"
+      component={PaymentMethodsScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="AddPaymentMethod"
+      component={AddPaymentMethodScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="Notifications"
+      component={NotificationsScreen}
+      options={{ headerShown: false }}
     />
   </Stack.Navigator>
 );

@@ -18,6 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Calendar } from 'react-native-calendars';
 import { supabase } from '../lib/supabase';
 import { calculateEnhancedTripPrice } from '../lib/enhancedPricing';
+import { getPricingEstimate } from '../lib/pricing';
 import WheelchairSelection from '../components/WheelchairSelection';
 import PricingDisplay from '../components/PricingDisplay';
 
@@ -61,47 +62,87 @@ const BookingScreen = ({ navigation }) => {
 
   // Pricing state
   const [estimatedPrice, setEstimatedPrice] = useState(null);
+  const [pricingBreakdown, setPricingBreakdown] = useState(null);
+  const [pricingResult, setPricingResult] = useState(null); // Store complete pricing result with distanceInfo
   const [calculating, setCalculating] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [profile, setProfile] = useState(null);
+  
+  // Payment method states
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [defaultPaymentMethod, setDefaultPaymentMethod] = useState(null);
+  const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(true);
 
   useEffect(() => {
     fetchProfile();
+    fetchPaymentMethods();
   }, []);
 
-  // Auto-calculate price when required fields change
+  // Auto-calculate price when required fields change - USING NEW PRICING LOGIC
   useEffect(() => {
     const autoCalculatePrice = async () => {
       // Check if all required fields are filled
       if (!pickupAddress || !destinationAddress || !clientWeight) {
         setEstimatedPrice(null);
+        setPricingBreakdown(null);
         return;
       }
 
       const weight = parseFloat(clientWeight);
       if (weight < 50 || weight > 1000) {
         setEstimatedPrice(null);
+        setPricingBreakdown(null);
         return;
       }
 
       setCalculating(true);
       try {
-        const price = await calculateEnhancedTripPrice({
+        console.log('🚀 Mobile: Using NEW pricing calculation');
+        
+        // Use NEW pricing calculation
+        const pricingResult = await getPricingEstimate({
           pickupAddress,
           destinationAddress,
-          pickupDate,
           isRoundTrip,
-          wheelchairType,
-          clientProvidesWheelchair,
-          isVeteran,
-          isEmergency,
+          pickupDateTime: pickupDate,
           clientWeight: weight,
+          isEmergency,
+          isVeteran,
         });
-        setEstimatedPrice(price);
+        
+        if (pricingResult.success && pricingResult.pricing) {
+          console.log('💰 Mobile: Complete pricing breakdown:', pricingResult.pricing);
+          setEstimatedPrice({
+            finalPrice: pricingResult.pricing.total,
+            distance: pricingResult.distanceInfo?.distance || 0,
+            breakdown: pricingResult.pricing
+          });
+          setPricingBreakdown(pricingResult.pricing);
+          setPricingResult(pricingResult); // Store complete result with distanceInfo
+        } else {
+          console.error('❌ Mobile: Error calculating pricing:', pricingResult.error);
+          // Fallback to old calculation
+          const price = await calculateEnhancedTripPrice({
+            pickupAddress,
+            destinationAddress,
+            pickupDate,
+            isRoundTrip,
+            wheelchairType,
+            clientProvidesWheelchair,
+            isVeteran,
+            isEmergency,
+            clientWeight: weight,
+          });
+          setEstimatedPrice(price);
+          setPricingBreakdown(null);
+          setPricingResult(null);
+        }
       } catch (error) {
         console.error('Error calculating price:', error);
         setEstimatedPrice(null);
+        setPricingBreakdown(null);
+        setPricingResult(null);
       } finally {
         setCalculating(false);
       }
@@ -137,6 +178,26 @@ const BookingScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+    }
+  };
+
+  const fetchPaymentMethods = async () => {
+    try {
+      setLoadingPaymentMethods(true);
+      console.log('Fetching payment methods for booking...');
+      
+      // Import the helper function
+      const { getPaymentMethodsMobile } = require('../lib/stripeHelpers');
+      const data = await getPaymentMethodsMobile();
+      
+      console.log('Payment methods fetched:', data.paymentMethods.length);
+      setPaymentMethods(data.paymentMethods);
+      setDefaultPaymentMethod(data.defaultPaymentMethod);
+    } catch (error) {
+      console.error('Error fetching payment methods:', error);
+      Alert.alert('Payment Method Error', 'Failed to load payment methods. Please check your internet connection and try again.');
+    } finally {
+      setLoadingPaymentMethods(false);
     }
   };
 
@@ -354,6 +415,25 @@ const BookingScreen = ({ navigation }) => {
       return;
     }
 
+    // Validate payment method exists
+    if (!defaultPaymentMethod) {
+      Alert.alert(
+        'Payment Method Required',
+        'You need to add a payment method before booking. Would you like to add one now?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Add Payment Method',
+            onPress: () => navigation.navigate('PaymentMethods'),
+          },
+        ]
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -371,6 +451,26 @@ const BookingScreen = ({ navigation }) => {
         price: estimatedPrice.finalPrice,
         distance: estimatedPrice.distance,
         status: 'pending',
+        payment_method_id: defaultPaymentMethod, // Include payment method
+        // 💰 NEW: Save complete pricing breakdown for cost transparency
+        pricing_breakdown_data: pricingBreakdown ? {
+          basePrice: pricingBreakdown.basePrice,
+          baseRatePerLeg: pricingBreakdown.baseRatePerLeg,
+          isBariatric: pricingBreakdown.isBariatric,
+          legs: pricingBreakdown.legs,
+          tripDistancePrice: pricingBreakdown.tripDistancePrice,
+          deadMileagePrice: pricingBreakdown.deadMileagePrice,
+          distancePrice: pricingBreakdown.distancePrice,
+          countySurcharge: pricingBreakdown.countySurcharge,
+          weekendSurcharge: pricingBreakdown.weekendSurcharge,
+          afterHoursSurcharge: pricingBreakdown.afterHoursSurcharge,
+          emergencySurcharge: pricingBreakdown.emergencySurcharge,
+          holidaySurcharge: pricingBreakdown.holidaySurcharge,
+          veteranDiscount: pricingBreakdown.veteranDiscount,
+          total: pricingBreakdown.total
+        } : null,
+        pricing_breakdown_total: pricingBreakdown?.total || estimatedPrice.finalPrice,
+        pricing_breakdown_locked_at: pricingBreakdown ? new Date().toISOString() : null,
       };
 
       const { data, error} = await supabase
@@ -382,8 +482,8 @@ const BookingScreen = ({ navigation }) => {
       if (error) throw error;
 
       Alert.alert(
-        'Success!',
-        'Your trip has been booked successfully!',
+        'Booking Submitted!',
+        'Your trip request has been submitted for approval. You will be notified once approved. Payment will only be processed after trip completion.',
         [
           {
             text: 'View Trips',
@@ -681,7 +781,68 @@ const BookingScreen = ({ navigation }) => {
             </View>
           )}
 
-          {estimatedPrice && <PricingDisplay pricing={estimatedPrice} />}
+          {pricingBreakdown && (
+            <PricingDisplay 
+              pricing={pricingBreakdown} 
+              distanceInfo={pricingResult?.distanceInfo}
+              countyInfo={pricingResult?.countyInfo}
+              deadMileageDistance={pricingResult?.deadMileageDistance}
+              isRoundTrip={isRoundTrip}
+            />
+          )}
+
+          {/* Payment Method Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment Method</Text>
+            
+            {loadingPaymentMethods ? (
+              <View style={styles.paymentMethodCard}>
+                <ActivityIndicator color="#5fbfc0" size="small" />
+                <Text style={styles.paymentLoadingText}>Loading payment methods...</Text>
+              </View>
+            ) : defaultPaymentMethod && paymentMethods.length > 0 ? (
+              <View style={styles.paymentMethodCard}>
+                <View style={styles.paymentMethodInfo}>
+                  <Text style={styles.paymentMethodIcon}>💳</Text>
+                  <View style={styles.paymentMethodDetails}>
+                    {(() => {
+                      const method = paymentMethods.find(pm => pm.id === defaultPaymentMethod);
+                      if (method?.card) {
+                        return (
+                          <>
+                            <Text style={styles.paymentMethodBrand}>
+                              {method.card.brand.toUpperCase()} •••• {method.card.last4}
+                            </Text>
+                            <Text style={styles.paymentMethodExpiry}>
+                              Expires {method.card.exp_month}/{method.card.exp_year}
+                            </Text>
+                          </>
+                        );
+                      }
+                      return <Text style={styles.paymentMethodBrand}>Default Payment Method</Text>;
+                    })()}
+                  </View>
+                  <TouchableOpacity onPress={() => navigation.navigate('PaymentMethods')}>
+                    <Text style={styles.changeButton}>Change</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.noPaymentMethodCard}>
+                <Text style={styles.noPaymentMethodIcon}>⚠️</Text>
+                <Text style={styles.noPaymentMethodTitle}>No Payment Method</Text>
+                <Text style={styles.noPaymentMethodText}>
+                  You need to add a payment method before booking a trip
+                </Text>
+                <TouchableOpacity 
+                  style={styles.addPaymentButton}
+                  onPress={() => navigation.navigate('PaymentMethods')}
+                >
+                  <Text style={styles.addPaymentButtonText}>+ Add Payment Method</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
 
           {estimatedPrice && (
             <View style={styles.policySection}>
@@ -723,6 +884,15 @@ const BookingScreen = ({ navigation }) => {
             >
               <Text style={styles.contactButtonText}>
                 Cannot Book - Contact Us
+              </Text>
+            </TouchableOpacity>
+          ) : !defaultPaymentMethod ? (
+            <TouchableOpacity
+              style={styles.addPaymentButtonLarge}
+              onPress={() => navigation.navigate('PaymentMethods')}
+            >
+              <Text style={styles.addPaymentButtonLargeText}>
+                Add Payment Method to Continue
               </Text>
             </TouchableOpacity>
           ) : (
@@ -1140,6 +1310,106 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  paymentMethodCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    marginBottom: 15,
+  },
+  paymentMethodInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  paymentMethodIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  paymentMethodDetails: {
+    flex: 1,
+  },
+  paymentMethodBrand: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 3,
+  },
+  paymentMethodExpiry: {
+    fontSize: 13,
+    color: '#666',
+  },
+  changeButton: {
+    fontSize: 15,
+    color: '#5fbfc0',
+    fontWeight: '600',
+  },
+  paymentLoadingText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#666',
+  },
+  noPaymentMethodCard: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#ffc107',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  noPaymentMethodIcon: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  noPaymentMethodTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 8,
+  },
+  noPaymentMethodText: {
+    fontSize: 14,
+    color: '#856404',
+    textAlign: 'center',
+    marginBottom: 15,
+    lineHeight: 20,
+  },
+  addPaymentButton: {
+    backgroundColor: '#5fbfc0',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  addPaymentButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  addPaymentButtonLarge: {
+    backgroundColor: '#ffc107',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginTop: 20,
+    borderWidth: 2,
+    borderColor: '#e0a800',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  addPaymentButtonLargeText: {
+    color: '#856404',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   bookButton: {
     backgroundColor: '#5fbfc0',

@@ -5,9 +5,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Image,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import AppHeader from '../components/AppHeader';
 
 const HomeScreen = ({ navigation }) => {
   const [profile, setProfile] = useState(null);
@@ -39,14 +39,7 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>Booking</Text>
-      </View>
+      <AppHeader />
 
       <View style={styles.welcomeCard}>
         <Text style={styles.welcomeTitle}>
@@ -149,22 +142,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: '#5fbfc0',
-    padding: 20,
-    paddingTop: 60,
-    alignItems: 'center',
-  },
-  logo: {
-    width: 80,
-    height: 80,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   welcomeCard: {
     backgroundColor: '#fff',

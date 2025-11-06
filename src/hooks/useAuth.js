@@ -13,7 +13,17 @@ export const AuthProvider = ({ children }) => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
-        console.log('Session error (expected on first load):', error.message);
+        // This is expected on first load or after token expiry - not an error
+        if (error.message?.includes('Refresh Token Not Found') || 
+            error.message?.includes('Invalid Refresh Token')) {
+          console.log('ℹ️ No existing session found (expected on first load)');
+        } else {
+          console.log('⚠️ Session error:', error.message);
+        }
+      } else if (session) {
+        console.log('✅ Session restored for user:', session.user.email);
+      } else {
+        console.log('ℹ️ No active session - user needs to log in');
       }
       setSession(session);
       setUser(session?.user ?? null);
@@ -22,7 +32,7 @@ export const AuthProvider = ({ children }) => {
       }
       setLoading(false);
     }).catch((error) => {
-      console.log('Session fetch error:', error);
+      console.log('⚠️ Session fetch error:', error.message);
       setLoading(false);
     });
 

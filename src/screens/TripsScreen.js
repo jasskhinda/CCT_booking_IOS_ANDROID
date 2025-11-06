@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import AppHeader from '../components/AppHeader';
 
 const TripsScreen = ({ navigation }) => {
   const [trips, setTrips] = useState([]);
@@ -108,23 +109,36 @@ const TripsScreen = ({ navigation }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending':
+        return '#FF9800'; // Orange for pending
+      case 'approved':
+        return '#4CAF50'; // Green for approved
+      case 'assigned':
+        return '#2196F3'; // Blue for assigned
       case 'upcoming':
-        return '#5fbfc0';
+        return '#5fbfc0'; // Teal for upcoming
+      case 'in_progress':
+        return '#9C27B0'; // Purple for in progress
       case 'completed':
-        return '#4CAF50';
+        return '#4CAF50'; // Green for completed
       case 'cancelled':
-        return '#FF5252';
+        return '#FF5252'; // Red for cancelled
       default:
-        return '#5fbfc0';
+        return '#757575'; // Gray for unknown
     }
   };
 
   const getStatusBadgeText = (status) => {
     switch (status) {
       case 'pending':
-        return 'UPCOMING';
+        return 'PENDING';
       case 'upcoming':
         return 'UPCOMING';
+      case 'approved':
+        return 'APPROVED';
+      case 'assigned':
+        return 'ASSIGNED';
+      case 'in_progress':
+        return 'IN PROGRESS';
       case 'completed':
         return 'COMPLETED';
       case 'cancelled':
@@ -206,10 +220,7 @@ const TripsScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Trips</Text>
-        <Text style={styles.headerSubtitle}>Your Trips</Text>
-      </View>
+      <AppHeader />
 
       <View style={styles.statsContainer}>
         <TouchableOpacity
@@ -315,23 +326,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: '#5fbfc0',
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 30,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#fff',
-    opacity: 0.9,
   },
   statsContainer: {
     flexDirection: 'row',

@@ -8,7 +8,9 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import AppHeader from '../components/AppHeader';
 
 const TripDetailsScreen = ({ route, navigation }) => {
   const { tripId } = route.params;
@@ -49,6 +51,12 @@ const TripDetailsScreen = ({ route, navigation }) => {
         .single();
 
       if (error) throw error;
+      
+      console.log('📊 Trip Details Data:', JSON.stringify(data, null, 2));
+      console.log('💰 Pricing Breakdown:', data.pricing_breakdown_data);
+      console.log('📏 Distance:', data.distance);
+      console.log('💵 Price:', data.price);
+      
       setTrip(data);
     } catch (error) {
       console.error('Error fetching trip details:', error);
@@ -143,12 +151,22 @@ const TripDetailsScreen = ({ route, navigation }) => {
   const statusColor = getStatusColor(trip.status);
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={[styles.statusHeader, { backgroundColor: statusColor }]}>
-        <Text style={styles.statusHeaderText}>{getStatusText(trip.status)}</Text>
-      </View>
+    <View style={styles.container}>
+      <AppHeader />
 
-      <View style={styles.content}>
+      <ScrollView style={styles.scrollContainer}>
+        <View style={[styles.statusHeader, { backgroundColor: statusColor }]}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={28} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.statusHeaderText}>{getStatusText(trip.status)}</Text>
+          <View style={styles.backButtonPlaceholder} />
+        </View>
+
+        <View style={styles.content}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trip Details</Text>
           <View style={styles.detailRow}>
@@ -213,14 +231,177 @@ const TripDetailsScreen = ({ route, navigation }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trip Information</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Distance:</Text>
-            <Text style={styles.priceValue}>{trip.distance?.toFixed(1) || '0.0'} miles</Text>
-          </View>
-          <View style={[styles.priceRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total Price:</Text>
-            <Text style={styles.totalValue}>${trip.price?.toFixed(2) || '0.00'}</Text>
-          </View>
+          
+          {/* Distance */}
+          {trip.distance > 0 && (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Distance:</Text>
+              <Text style={styles.priceValue}>{trip.distance?.toFixed(1)} miles</Text>
+            </View>
+          )}
+
+          {/* Wheelchair */}
+          {trip.wheelchair_type && trip.wheelchair_type !== 'no_wheelchair' && trip.wheelchair_type !== 'none' && (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Wheelchair:</Text>
+              <Text style={styles.priceValue}>
+                {trip.wheelchair_type === 'provided' ? 'CCT Provided' : 
+                 trip.wheelchair_type === 'manual' ? 'Manual' :
+                 trip.wheelchair_type === 'power' ? 'Power' : 
+                 'Required'}
+              </Text>
+            </View>
+          )}
+
+          {/* Round Trip */}
+          {trip.is_round_trip && (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Trip Type:</Text>
+              <Text style={styles.priceValue}>Round Trip</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Cost Breakdown</Text>
+          
+          {trip.pricing_breakdown_locked_at && (
+            <View style={styles.lockedNotice}>
+              <Text style={styles.lockedLabel}>Pricing Locked from Booking</Text>
+              <Text style={styles.lockedDate}>
+                {new Date(trip.pricing_breakdown_locked_at).toLocaleDateString()}
+              </Text>
+            </View>
+          )}
+
+          {trip.pricing_breakdown_data ? (
+            <>
+              {/* Base Fare */}
+              {trip.pricing_breakdown_data.basePrice > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>
+                    Base fare ({trip.pricing_breakdown_data.legs || 1} leg
+                    {(trip.pricing_breakdown_data.legs || 1) > 1 ? 's' : ''} @ $
+                    {trip.pricing_breakdown_data.baseRatePerLeg || 50}/leg)
+                    {trip.pricing_breakdown_data.isBariatric ? ' 🚑' : ''}
+                  </Text>
+                  <Text style={styles.priceValue}>
+                    ${trip.pricing_breakdown_data.basePrice.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Distance Charge - Check both old and new field names */}
+              {(trip.pricing_breakdown_data.tripDistancePrice > 0 || trip.pricing_breakdown_data.distancePrice > 0) && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>
+                    Distance charge ({trip.pricing_breakdown_data.isInFranklinCounty !== false ? '$3/mile (Franklin County)' : '$4/mile (Outside Franklin County)'})
+                  </Text>
+                  <Text style={styles.priceValue}>
+                    ${(trip.pricing_breakdown_data.tripDistancePrice || trip.pricing_breakdown_data.distancePrice || 0).toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* County Surcharge - Check both field names */}
+              {(trip.pricing_breakdown_data.countySurcharge > 0 || trip.pricing_breakdown_data.countyPrice > 0) && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>County surcharge</Text>
+                  <Text style={styles.priceValue}>
+                    ${(trip.pricing_breakdown_data.countySurcharge || trip.pricing_breakdown_data.countyPrice || 0).toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Dead Mileage */}
+              {trip.pricing_breakdown_data.deadMileagePrice > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Dead mileage</Text>
+                  <Text style={styles.priceValue}>
+                    ${trip.pricing_breakdown_data.deadMileagePrice.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Weekend Surcharge */}
+              {trip.pricing_breakdown_data.weekendSurcharge > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Weekend surcharge</Text>
+                  <Text style={styles.priceValue}>
+                    ${trip.pricing_breakdown_data.weekendSurcharge.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* After-Hours Surcharge */}
+              {trip.pricing_breakdown_data.afterHoursSurcharge > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>After-hours surcharge</Text>
+                  <Text style={styles.priceValue}>
+                    ${trip.pricing_breakdown_data.afterHoursSurcharge.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Combined Weekend/After-hours (for old bookings) */}
+              {trip.pricing_breakdown_data.weekendAfterHoursSurcharge > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Weekend/After-hours surcharge</Text>
+                  <Text style={styles.priceValue}>
+                    ${trip.pricing_breakdown_data.weekendAfterHoursSurcharge.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Emergency Surcharge */}
+              {trip.pricing_breakdown_data.emergencySurcharge > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Emergency surcharge</Text>
+                  <Text style={styles.priceValue}>
+                    ${trip.pricing_breakdown_data.emergencySurcharge.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Holiday Surcharge */}
+              {trip.pricing_breakdown_data.holidaySurcharge > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Holiday surcharge</Text>
+                  <Text style={styles.priceValue}>
+                    ${trip.pricing_breakdown_data.holidaySurcharge.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              {/* Veteran Discount */}
+              {trip.pricing_breakdown_data.veteranDiscount > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={[styles.priceLabel, styles.discountText]}>
+                    Veteran discount (20%) 🎖️
+                  </Text>
+                  <Text style={[styles.priceValue, styles.discountText]}>
+                    -${trip.pricing_breakdown_data.veteranDiscount.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.divider} />
+
+              {/* Total Price */}
+              <View style={[styles.priceRow, styles.totalRow]}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalValue}>
+                  ${(trip.pricing_breakdown_data.total || trip.price || 0).toFixed(2)}
+                </Text>
+              </View>
+            </>
+          ) : (
+            // Fallback if no pricing breakdown data
+            <View style={[styles.priceRow, styles.totalRow]}>
+              <Text style={styles.totalLabel}>Total Price:</Text>
+              <Text style={styles.totalValue}>${trip.price?.toFixed(2) || '0.00'}</Text>
+            </View>
+          )}
         </View>
 
         {trip.wheelchair_type && (
@@ -246,6 +427,7 @@ const TripDetailsScreen = ({ route, navigation }) => {
         )}
       </View>
     </ScrollView>
+    </View>
   );
 };
 
@@ -254,20 +436,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  scrollContainer: {
+    flex: 1,
+  },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statusHeader: {
-    padding: 20,
-    paddingTop: 60,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    paddingTop: 20,
+  },
+  backButton: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  backButtonPlaceholder: {
+    width: 44,
   },
   statusHeaderText: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
+    flex: 1,
+    textAlign: 'center',
   },
   content: {
     padding: 20,
@@ -382,6 +578,29 @@ const styles = StyleSheet.create({
   },
   discountText: {
     color: '#27AE60',
+  },
+  lockedNotice: {
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 15,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4caf50',
+  },
+  lockedLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2e7d32',
+    marginBottom: 4,
+  },
+  lockedDate: {
+    fontSize: 12,
+    color: '#558b2f',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 12,
   },
   totalRow: {
     borderTopWidth: 1,

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import AppHeader from '../components/AppHeader';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, signOut } = useAuth();
@@ -131,9 +132,7 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Profile</Text>
-      </View>
+      <AppHeader />
 
       <View style={styles.content}>
         <View style={styles.avatarSection}>
@@ -252,6 +251,23 @@ const ProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Payment</Text>
+          <TouchableOpacity
+            style={styles.paymentMethodButton}
+            onPress={() => navigation.navigate('PaymentMethods')}
+          >
+            <View style={styles.paymentMethodContent}>
+              <Text style={styles.paymentMethodIcon}>💳</Text>
+              <View style={styles.paymentMethodTextContainer}>
+                <Text style={styles.paymentMethodTitle}>Payment Methods</Text>
+                <Text style={styles.paymentMethodSubtitle}>Manage your saved cards</Text>
+              </View>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <Text style={styles.signOutButtonText}>Sign Out</Text>
         </TouchableOpacity>
@@ -273,16 +289,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  header: {
-    backgroundColor: '#5fbfc0',
-    padding: 20,
-    paddingTop: 60,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   content: {
     padding: 20,
@@ -409,6 +415,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: '600',
+  },
+  paymentMethodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  paymentMethodContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  paymentMethodIcon: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  paymentMethodTextContainer: {
+    flex: 1,
+  },
+  paymentMethodTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  paymentMethodSubtitle: {
+    fontSize: 13,
+    color: '#666',
+  },
+  chevron: {
+    fontSize: 28,
+    color: '#999',
+    fontWeight: '300',
   },
   signOutButton: {
     backgroundColor: '#E74C3C',
