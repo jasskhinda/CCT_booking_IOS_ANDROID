@@ -81,6 +81,7 @@ export default function UberLikeBookingScreen({ route }) {
   const [estimatedFare, setEstimatedFare] = useState(null);
   const [pricingBreakdown, setPricingBreakdown] = useState(null);
   const [countyInfo, setCountyInfo] = useState(null);
+  const [deadMileageDistance, setDeadMileageDistance] = useState(0);
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
 
   // Collapsible sections state
@@ -177,6 +178,9 @@ export default function UberLikeBookingScreen({ route }) {
 
   const recalculatePricing = async () => {
     try {
+      // distanceMiles stores ONE-WAY distance, double it for round trips
+      const distanceForPricing = isRoundTrip ? distanceMiles * 2 : distanceMiles;
+      
       const pricingResult = await getPricingEstimate({
         pickupAddress,
         destinationAddress,
@@ -184,7 +188,7 @@ export default function UberLikeBookingScreen({ route }) {
         pickupDateTime: pickupDate.toISOString(),
         wheelchairType,
         isEmergency,
-        distance: distanceMiles,
+        preCalculatedDistance: distanceForPricing,
         clientWeight: clientWeight ? parseInt(clientWeight) : null,
       });
 
@@ -192,6 +196,7 @@ export default function UberLikeBookingScreen({ route }) {
         setEstimatedFare(pricingResult.pricing.total);
         setPricingBreakdown(pricingResult.pricing);
         setCountyInfo(pricingResult.countyInfo);
+        setDeadMileageDistance(pricingResult.deadMileageDistance || 0);
         console.log('💰 Comprehensive pricing calculated:', pricingResult);
       }
     } catch (error) {
@@ -419,27 +424,36 @@ export default function UberLikeBookingScreen({ route }) {
         ? `${destinationAddress}, ${destinationDetails}`
         : destinationAddress;
 
+      // Build special requirements text combining notes and additional info
+      const specialRequirementsArray = [];
+      if (notes) specialRequirementsArray.push(notes);
+      if (parseInt(additionalPassengers) > 0) {
+        specialRequirementsArray.push(`Additional passengers: ${additionalPassengers}`);
+      }
+      if (wheelchairType === 'provided') {
+        if (wheelchairRequirements) specialRequirementsArray.push(`Wheelchair: ${wheelchairRequirements}`);
+        if (wheelchairDetails) specialRequirementsArray.push(wheelchairDetails);
+      }
+      
+      const specialRequirements = specialRequirementsArray.length > 0
+        ? specialRequirementsArray.join(' | ')
+        : null;
+
+      // Use ONLY columns that exist in booking_app schema
       const tripData = {
-        user_id: user.id, // Individual user booking for themselves
-        facility_id: null, // Not a facility booking
-        managed_client_id: null, // Not a managed client
+        user_id: user.id,
         pickup_address: fullPickupAddress,
-        pickup_details: pickupDetails || null,
         destination_address: fullDestinationAddress,
-        destination_details: destinationDetails || null,
         pickup_time: pickupDate.toISOString(),
-        is_round_trip: isRoundTrip,
-        wheelchair_type: wheelchairType,
-        additional_passengers: parseInt(additionalPassengers) || 0,
-        trip_notes: notes,
+        return_pickup_time: isRoundTrip ? returnTime.toISOString() : null,
         status: 'pending',
-        booked_by: user.id,
-        bill_to: 'user', // Individual users pay for their own trips
         price: estimatedFare || 0,
+        wheelchair_type: wheelchairType,
+        is_round_trip: isRoundTrip,
         distance: distanceMiles > 0 ? Math.round(distanceMiles * 10) / 10 : null,
-        route_duration: estimatedDuration || null,
-        route_distance_text: distanceMiles > 0 ? `${distanceMiles.toFixed(1)} mi` : null,
-        route_duration_text: estimatedDuration || null,
+        payment_method_id: null, // Will be set when payment is processed
+        special_requirements: specialRequirements,
+        // Save detailed pricing breakdown for trip details/edit
         pricing_breakdown_data: pricingBreakdown ? {
           pricing: pricingBreakdown,
           distance: { distance: distanceMiles, unit: 'miles' },
@@ -448,7 +462,6 @@ export default function UberLikeBookingScreen({ route }) {
             isEmergency,
             wheelchairType,
             additionalPassengers: parseInt(additionalPassengers) || 0,
-            billTo: 'user'
           },
           wheelchairInfo: {
             type: wheelchairType,
@@ -457,11 +470,10 @@ export default function UberLikeBookingScreen({ route }) {
           },
           clientInfo: {
             weight: clientWeight ? parseInt(clientWeight) : null,
-            height: clientHeightFeet && clientHeightInches
-              ? `${clientHeightFeet}'${clientHeightInches}"`
-              : null,
-            dob: clientDOB || null,
-            email: clientEmail || null,
+          },
+          addressDetails: {
+            pickupDetails: pickupDetails || null,
+            destinationDetails: destinationDetails || null,
           },
           createdAt: new Date().toISOString(),
           source: 'BookingMobileApp'
@@ -626,8 +638,21 @@ export default function UberLikeBookingScreen({ route }) {
                     summary: fastestRoute.summary || 'No summary'
                   });
 
-                  setDistanceMiles(Math.round(distanceInMiles * 100) / 100); // Round to 2 decimals (same as web)
+                  // Store the ONE-WAY distance (for display purposes)
+                  const oneWayDistance = Math.round(distanceInMiles * 100) / 100;
+                  setDistanceMiles(oneWayDistance);
                   setEstimatedDuration(durationText);
+
+                  // For round trips, double the distance before pricing calculation
+                  // This matches facility_app behavior (line 685 in facility_app/lib/pricing.js)
+                  const distanceForPricing = isRoundTrip ? oneWayDistance * 2 : oneWayDistance;
+
+                  console.log(`📏 Distance calculation:`, {
+                    oneWayMiles: oneWayDistance,
+                    isRoundTrip,
+                    distanceForPricing,
+                    calculation: isRoundTrip ? `${oneWayDistance} * 2 = ${distanceForPricing}` : oneWayDistance
+                  });
 
                   // Calculate comprehensive pricing with county detection and all fees
                   const pricingResult = await getPricingEstimate({
@@ -637,13 +662,15 @@ export default function UberLikeBookingScreen({ route }) {
                     pickupDateTime: pickupDate.toISOString(),
                     wheelchairType,
                     isEmergency,
-                    distance: Math.round(distanceInMiles * 100) / 100,
+                    preCalculatedDistance: distanceForPricing,
                     clientWeight: clientWeight ? parseInt(clientWeight) : null,
                   });
 
                   if (pricingResult.success && pricingResult.pricing) {
                     setEstimatedFare(pricingResult.pricing.total);
                     setPricingBreakdown(pricingResult.pricing);
+                    setCountyInfo(pricingResult.countyInfo);
+                    setDeadMileageDistance(pricingResult.deadMileageDistance || 0);
                     console.log('💰 Final price:', pricingResult.pricing.total);
                     console.log('💰 Breakdown:', pricingResult.pricing);
                   }
@@ -653,12 +680,15 @@ export default function UberLikeBookingScreen({ route }) {
               } catch (error) {
                 console.error('❌ Google Directions API error:', error);
                 // Fallback to MapViewDirections result
-                const distanceInMiles = result.distance * 0.621371;
+                const oneWayDistance = result.distance * 0.621371;
                 const durationInMinutes = Math.round(result.duration);
 
-                setDistanceMiles(distanceInMiles);
+                setDistanceMiles(oneWayDistance);
                 setEstimatedDuration(`${durationInMinutes} min`);
-                console.log('⚠️ Using MapViewDirections fallback:', distanceInMiles.toFixed(2), 'miles');
+                console.log('⚠️ Using MapViewDirections fallback:', oneWayDistance.toFixed(2), 'miles');
+
+                // For round trips, double the distance before pricing calculation
+                const distanceForPricing = isRoundTrip ? oneWayDistance * 2 : oneWayDistance;
 
                 // Calculate pricing with fallback distance
                 const pricingResult = await getPricingEstimate({
@@ -668,12 +698,15 @@ export default function UberLikeBookingScreen({ route }) {
                   pickupDateTime: pickupDate.toISOString(),
                   wheelchairType,
                   isEmergency,
-                  distance: distanceInMiles,
+                  preCalculatedDistance: distanceForPricing,
                   clientWeight: clientWeight ? parseInt(clientWeight) : null,
                 });
 
                 if (pricingResult.success && pricingResult.pricing) {
                   setEstimatedFare(pricingResult.pricing.total);
+                  setPricingBreakdown(pricingResult.pricing);
+                  setCountyInfo(pricingResult.countyInfo);
+                  setDeadMileageDistance(pricingResult.deadMileageDistance || 0);
                 }
               }
             }}
@@ -1183,44 +1216,51 @@ export default function UberLikeBookingScreen({ route }) {
 
               <TouchableOpacity
                 style={styles.breakdownToggle}
-                onPress={() => setShowPriceBreakdown(!showPriceBreakdown)}
+                onPress={() => {
+                  console.log('🔍 Toggle price breakdown:', {
+                    showPriceBreakdown: !showPriceBreakdown,
+                    pricingBreakdown: pricingBreakdown,
+                    hasPricingBreakdown: !!pricingBreakdown
+                  });
+                  setShowPriceBreakdown(!showPriceBreakdown);
+                }}
               >
                 <Text style={styles.breakdownToggleText}>
                   {showPriceBreakdown ? '▼' : '▶'} View price breakdown
                 </Text>
               </TouchableOpacity>
 
-              {showPriceBreakdown && (
+              {showPriceBreakdown && pricingBreakdown && (
                 <View style={styles.breakdownSection}>
                   {/* Base Fare */}
-                  {pricingBreakdown.basePrice > 0 && (
+                  {pricingBreakdown.basePrice !== undefined && !isNaN(pricingBreakdown.basePrice) && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>
-                        Base fare ({isRoundTrip ? '2' : '1'} leg @ {pricingBreakdown.isBariatric ? '$150' : '$50'}/leg)
+                        Base fare ({isRoundTrip ? '2' : '1'} leg{isRoundTrip ? 's' : ''} @ ${pricingBreakdown.baseRatePerLeg || (pricingBreakdown.isBariatric ? 150 : 50)}/leg{pricingBreakdown.isBariatric ? ' (Bariatric)' : ''})
                       </Text>
                       <Text style={styles.breakdownValue}>
-                        {formatCurrency(pricingBreakdown.basePrice + pricingBreakdown.roundTripPrice)}
+                        {formatCurrency(pricingBreakdown.basePrice)}
                       </Text>
                     </View>
                   )}
 
                   {/* Distance Charge */}
-                  {pricingBreakdown.distancePrice > 0 && (
+                  {pricingBreakdown.tripDistancePrice > 0 && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>
                         Distance charge ({countyInfo?.isInFranklinCounty ? '$3/mile (Franklin County)' : '$4/mile (Outside Franklin County)'})
                       </Text>
-                      <Text style={styles.breakdownValue}>{formatCurrency(pricingBreakdown.distancePrice)}</Text>
+                      <Text style={styles.breakdownValue}>{formatCurrency(pricingBreakdown.tripDistancePrice)}</Text>
                     </View>
                   )}
 
                   {/* County Surcharge */}
-                  {pricingBreakdown.countyPrice > 0 && (
+                  {pricingBreakdown.countySurcharge > 0 && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>
                         County surcharge ({countyInfo?.countiesOut || 2} counties @ $50/county)
                       </Text>
-                      <Text style={styles.breakdownValue}>{formatCurrency(pricingBreakdown.countyPrice)}</Text>
+                      <Text style={styles.breakdownValue}>{formatCurrency(pricingBreakdown.countySurcharge)}</Text>
                     </View>
                   )}
 
@@ -1228,7 +1268,7 @@ export default function UberLikeBookingScreen({ route }) {
                   {pricingBreakdown.deadMileagePrice > 0 && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>
-                        Dead mileage ({(pricingBreakdown.deadMileagePrice / 4).toFixed(1)} mi @ $4/mile)
+                        Dead mileage ({deadMileageDistance.toFixed(1)} mi @ $4/mile)
                       </Text>
                       <Text style={styles.breakdownValue}>{formatCurrency(pricingBreakdown.deadMileagePrice)}</Text>
                     </View>
@@ -1276,7 +1316,15 @@ export default function UberLikeBookingScreen({ route }) {
                 </View>
               )}
 
-              {pricingBreakdown.deadMileagePrice > 0 && (
+              {showPriceBreakdown && !pricingBreakdown && (
+                <View style={styles.breakdownSection}>
+                  <Text style={styles.breakdownLabel}>
+                    Pricing breakdown not available. Please calculate fare first.
+                  </Text>
+                </View>
+              )}
+
+              {pricingBreakdown?.deadMileagePrice > 0 && (
                 <Text style={styles.pricingDisclaimer}>
                   • Dead mileage fee ($4/mile from office to pickup and back) for trips 2+ counties out
                 </Text>

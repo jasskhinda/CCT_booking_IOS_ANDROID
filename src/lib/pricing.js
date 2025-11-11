@@ -105,14 +105,15 @@ export async function calculateDeadMileage(pickup, destination, isRoundTrip) {
         }
       };
     } else {
-      // One-way: Office → Pickup + Destination → Office
-      const destinationToOffice = await calculateDistance(destination, officeAddress);
+      // One-way: Office → Pickup + Office → Destination
+      // Driver returns from DESTINATION (where they dropped off), not from pickup
+      const officeToDestination = await calculateDistance(officeAddress, destination);
       
       return {
-        distance: officeToPickup.distance + destinationToOffice.distance,
+        distance: officeToPickup.distance + officeToDestination.distance,
         breakdown: {
           officeToPickup: officeToPickup.distance,
-          destinationToOffice: destinationToOffice.distance,
+          officeToDestination: officeToDestination.distance,
         }
       };
     }
@@ -269,6 +270,7 @@ export function calculateTripPrice({
     
     tripDistancePrice: 0,
     deadMileagePrice: 0,
+    deadMileageDistance: 0,
     distancePrice: 0,
     
     countySurcharge: 0,
@@ -295,12 +297,16 @@ export function calculateTripPrice({
     ? PRICING_CONFIG.DISTANCE.FRANKLIN_COUNTY
     : PRICING_CONFIG.DISTANCE.OUTSIDE_FRANKLIN;
 
+  // Distance is calculated using actual driving route
+  // For round trips, the calling code doubles the one-way distance before passing it here
+  // This matches facility_app behavior (see facility_app/lib/pricing.js line 685)
   if (tripDistance > 0) {
-    breakdown.tripDistancePrice = tripDistance * pricePerMile * breakdown.legs;
+    breakdown.tripDistancePrice = tripDistance * pricePerMile;
   }
 
   if (deadMileageDistance > 0) {
     breakdown.deadMileagePrice = deadMileageDistance * PRICING_CONFIG.DISTANCE.DEAD_MILEAGE;
+    breakdown.deadMileageDistance = deadMileageDistance;
   }
 
   breakdown.distancePrice = breakdown.tripDistancePrice + breakdown.deadMileagePrice;
@@ -449,6 +455,14 @@ export async function getPricingEstimate({
   }
 }
 
+/**
+ * Format currency for display
+ */
+export function formatCurrency(amount) {
+  if (amount === null || amount === undefined) return '$0.00';
+  return `$${amount.toFixed(2)}`;
+}
+
 export default {
   PRICING_CONFIG,
   calculateDistance,
@@ -459,4 +473,5 @@ export default {
   isHoliday,
   calculateTripPrice,
   getPricingEstimate,
+  formatCurrency,
 };

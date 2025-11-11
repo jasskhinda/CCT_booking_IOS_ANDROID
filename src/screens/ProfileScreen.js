@@ -78,6 +78,7 @@ const ProfileScreen = ({ navigation }) => {
         .from('profiles')
         .upsert({
           id: user.id,
+          // Include email from auth to prevent trigger from trying to sync it
           email: user.email,
           first_name: firstName,
           last_name: lastName,

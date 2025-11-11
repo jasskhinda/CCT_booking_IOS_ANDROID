@@ -274,113 +274,117 @@ const TripDetailsScreen = ({ route, navigation }) => {
             </View>
           )}
 
-          {trip.pricing_breakdown_data ? (
+          {trip.pricing_breakdown_data?.pricing ? (
             <>
               {/* Base Fare */}
-              {trip.pricing_breakdown_data.basePrice > 0 && (
+              {trip.pricing_breakdown_data.pricing.basePrice > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>
-                    Base fare ({trip.pricing_breakdown_data.legs || 1} leg
-                    {(trip.pricing_breakdown_data.legs || 1) > 1 ? 's' : ''} @ $
-                    {trip.pricing_breakdown_data.baseRatePerLeg || 50}/leg)
-                    {trip.pricing_breakdown_data.isBariatric ? ' 🚑' : ''}
+                    Base fare ({trip.pricing_breakdown_data.pricing.legs || 1} leg
+                    {(trip.pricing_breakdown_data.pricing.legs || 1) > 1 ? 's' : ''} @ $
+                    {trip.pricing_breakdown_data.pricing.baseRatePerLeg || 50}/leg
+                    {trip.pricing_breakdown_data.pricing.isBariatric ? ' (Bariatric)' : ''})
                   </Text>
                   <Text style={styles.priceValue}>
-                    ${trip.pricing_breakdown_data.basePrice.toFixed(2)}
+                    ${trip.pricing_breakdown_data.pricing.basePrice.toFixed(2)}
                   </Text>
                 </View>
               )}
 
-              {/* Distance Charge - Check both old and new field names */}
-              {(trip.pricing_breakdown_data.tripDistancePrice > 0 || trip.pricing_breakdown_data.distancePrice > 0) && (
+              {/* Distance Charge - Use tripDistancePrice */}
+              {trip.pricing_breakdown_data.pricing.tripDistancePrice > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>
-                    Distance charge ({trip.pricing_breakdown_data.isInFranklinCounty !== false ? '$3/mile (Franklin County)' : '$4/mile (Outside Franklin County)'})
+                    Distance charge ({trip.pricing_breakdown_data.pricing.isInFranklinCounty !== false ? '$3/mile (Franklin County)' : '$4/mile (Outside Franklin County)'})
                   </Text>
                   <Text style={styles.priceValue}>
-                    ${(trip.pricing_breakdown_data.tripDistancePrice || trip.pricing_breakdown_data.distancePrice || 0).toFixed(2)}
+                    ${trip.pricing_breakdown_data.pricing.tripDistancePrice.toFixed(2)}
                   </Text>
                 </View>
               )}
 
-              {/* County Surcharge - Check both field names */}
-              {(trip.pricing_breakdown_data.countySurcharge > 0 || trip.pricing_breakdown_data.countyPrice > 0) && (
+              {/* County Surcharge */}
+              {trip.pricing_breakdown_data.pricing.countySurcharge > 0 && (
                 <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>County surcharge</Text>
+                  <Text style={styles.priceLabel}>
+                    County surcharge ({trip.pricing_breakdown_data.pricing.countyInfo?.countiesOut || 2} counties @ $50/county)
+                  </Text>
                   <Text style={styles.priceValue}>
-                    ${(trip.pricing_breakdown_data.countySurcharge || trip.pricing_breakdown_data.countyPrice || 0).toFixed(2)}
+                    ${trip.pricing_breakdown_data.pricing.countySurcharge.toFixed(2)}
                   </Text>
                 </View>
               )}
 
               {/* Dead Mileage */}
-              {trip.pricing_breakdown_data.deadMileagePrice > 0 && (
+              {trip.pricing_breakdown_data.pricing.deadMileagePrice > 0 && (
                 <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>Dead mileage</Text>
+                  <Text style={styles.priceLabel}>
+                    Dead mileage ({trip.pricing_breakdown_data.pricing.deadMileageDistance?.toFixed(1) || (trip.pricing_breakdown_data.pricing.deadMileagePrice / 4).toFixed(1)} mi @ $4/mile)
+                  </Text>
                   <Text style={styles.priceValue}>
-                    ${trip.pricing_breakdown_data.deadMileagePrice.toFixed(2)}
+                    ${trip.pricing_breakdown_data.pricing.deadMileagePrice.toFixed(2)}
                   </Text>
                 </View>
               )}
 
               {/* Weekend Surcharge */}
-              {trip.pricing_breakdown_data.weekendSurcharge > 0 && (
+              {trip.pricing_breakdown_data.pricing.weekendSurcharge > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>Weekend surcharge</Text>
                   <Text style={styles.priceValue}>
-                    ${trip.pricing_breakdown_data.weekendSurcharge.toFixed(2)}
+                    ${trip.pricing_breakdown_data.pricing.weekendSurcharge.toFixed(2)}
                   </Text>
                 </View>
               )}
 
               {/* After-Hours Surcharge */}
-              {trip.pricing_breakdown_data.afterHoursSurcharge > 0 && (
+              {trip.pricing_breakdown_data.pricing.afterHoursSurcharge > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>After-hours surcharge</Text>
                   <Text style={styles.priceValue}>
-                    ${trip.pricing_breakdown_data.afterHoursSurcharge.toFixed(2)}
+                    ${trip.pricing_breakdown_data.pricing.afterHoursSurcharge.toFixed(2)}
                   </Text>
                 </View>
               )}
 
               {/* Combined Weekend/After-hours (for old bookings) */}
-              {trip.pricing_breakdown_data.weekendAfterHoursSurcharge > 0 && (
+              {trip.pricing_breakdown_data.pricing.weekendAfterHoursSurcharge > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>Weekend/After-hours surcharge</Text>
                   <Text style={styles.priceValue}>
-                    ${trip.pricing_breakdown_data.weekendAfterHoursSurcharge.toFixed(2)}
+                    ${trip.pricing_breakdown_data.pricing.weekendAfterHoursSurcharge.toFixed(2)}
                   </Text>
                 </View>
               )}
 
               {/* Emergency Surcharge */}
-              {trip.pricing_breakdown_data.emergencySurcharge > 0 && (
+              {trip.pricing_breakdown_data.pricing.emergencySurcharge > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>Emergency surcharge</Text>
                   <Text style={styles.priceValue}>
-                    ${trip.pricing_breakdown_data.emergencySurcharge.toFixed(2)}
+                    ${trip.pricing_breakdown_data.pricing.emergencySurcharge.toFixed(2)}
                   </Text>
                 </View>
               )}
 
               {/* Holiday Surcharge */}
-              {trip.pricing_breakdown_data.holidaySurcharge > 0 && (
+              {trip.pricing_breakdown_data.pricing.holidaySurcharge > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>Holiday surcharge</Text>
                   <Text style={styles.priceValue}>
-                    ${trip.pricing_breakdown_data.holidaySurcharge.toFixed(2)}
+                    ${trip.pricing_breakdown_data.pricing.holidaySurcharge.toFixed(2)}
                   </Text>
                 </View>
               )}
 
               {/* Veteran Discount */}
-              {trip.pricing_breakdown_data.veteranDiscount > 0 && (
+              {trip.pricing_breakdown_data.pricing.veteranDiscount > 0 && (
                 <View style={styles.priceRow}>
                   <Text style={[styles.priceLabel, styles.discountText]}>
                     Veteran discount (20%) 🎖️
                   </Text>
                   <Text style={[styles.priceValue, styles.discountText]}>
-                    -${trip.pricing_breakdown_data.veteranDiscount.toFixed(2)}
+                    -${trip.pricing_breakdown_data.pricing.veteranDiscount.toFixed(2)}
                   </Text>
                 </View>
               )}
@@ -391,8 +395,30 @@ const TripDetailsScreen = ({ route, navigation }) => {
               <View style={[styles.priceRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Total</Text>
                 <Text style={styles.totalValue}>
-                  ${(trip.pricing_breakdown_data.total || trip.price || 0).toFixed(2)}
+                  ${(trip.pricing_breakdown_data.pricing.total || trip.price || 0).toFixed(2)}
                 </Text>
+              </View>
+
+              {/* Pricing Notes */}
+              <View style={styles.pricingNotes}>
+                {trip.pricing_breakdown_data.pricing.isBariatric && (
+                  <Text style={styles.noteText}>
+                    • Enhanced bariatric rate ($150 vs $50) applied based on client weight
+                  </Text>
+                )}
+                {trip.pricing_breakdown_data.pricing.deadMileagePrice > 0 && (
+                  <Text style={styles.noteText}>
+                    • Dead mileage fee ($4/mile from office to pickup and back) for trips 2+ counties out
+                  </Text>
+                )}
+                <Text style={styles.noteText}>
+                  • Additional charges apply for off-hours, weekends, or wheelchair accessibility
+                </Text>
+                {trip.pricing_breakdown_locked_at && (
+                  <Text style={styles.noteText}>
+                    • Final fare was locked at booking time
+                  </Text>
+                )}
               </View>
             </>
           ) : (
@@ -617,6 +643,18 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#5fbfc0',
+  },
+  pricingNotes: {
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  noteText: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 18,
+    marginBottom: 6,
   },
   requirementItem: {
     flexDirection: 'row',
