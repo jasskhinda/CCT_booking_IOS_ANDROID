@@ -125,49 +125,126 @@ export async function calculateDeadMileage(pickup, destination, isRoundTrip) {
 
 /**
  * Check if address is in Franklin County, Ohio
+ * ENHANCED: Now includes county override patterns (21 Franklin + 6 Lancaster)
+ * Priority system: Lancaster patterns > Franklin patterns > Google API
  */
 export async function checkFranklinCountyStatus(pickup, destination) {
   try {
-    // Check pickup county
+    const pickupLower = pickup?.toLowerCase() || '';
+    const destinationLower = destination?.toLowerCase() || '';
+
+    console.log('📍 County Detection (booking_mobile):', { pickup, destination });
+
+    // PRIORITY 1: Lancaster/Fairfield County patterns (forces 2+ counties out)
+    // These 6 patterns override everything else
+    const lancasterPatterns = [
+      'lancaster, oh',
+      'lancaster,oh',
+      'lancaster ohio',
+      '43130',              // Lancaster zip
+      'fairfield county',
+      'fairfield co'
+    ];
+
+    const isPickupLancaster = lancasterPatterns.some(pattern => pickupLower.includes(pattern));
+    const isDestinationLancaster = lancasterPatterns.some(pattern => destinationLower.includes(pattern));
+
+    // If either address matches Lancaster patterns, force 2+ counties out
+    if (isPickupLancaster || isDestinationLancaster) {
+      console.log('🚨 LANCASTER OVERRIDE APPLIED: Fairfield County detected → 2+ counties out');
+      return {
+        isInFranklinCounty: false,
+        countiesOut: 2,
+        pickupCounty: isPickupLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County',
+        destinationCounty: isDestinationLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County',
+      };
+    }
+
+    // PRIORITY 2: Franklin County patterns (forces 0 counties out)
+    // These 21 patterns override Google API
+    const franklinCountyPatterns = [
+      'westerville',
+      'columbus',
+      'dublin',
+      'gahanna',
+      'reynoldsburg',
+      'grove city',
+      'hilliard',
+      'upper arlington',
+      'bexley',
+      'whitehall',
+      'worthington',
+      'grandview heights',
+      'groveport',
+      'new albany',
+      'pickerington',
+      'canal winchester',
+      'lockbourne',
+      '43082',              // Westerville zip
+      '43228',              // Columbus zip
+      'executive campus dr',
+      'franshire'
+    ];
+
+    const isPickupFranklin = franklinCountyPatterns.some(pattern => pickupLower.includes(pattern));
+    const isDestinationFranklin = franklinCountyPatterns.some(pattern => destinationLower.includes(pattern));
+
+    // If BOTH addresses match Franklin patterns, force 0 counties out
+    if (isPickupFranklin && isDestinationFranklin) {
+      console.log('✅ FRANKLIN OVERRIDE APPLIED: Both addresses in Franklin County → 0 counties out');
+      return {
+        isInFranklinCounty: true,
+        countiesOut: 0,
+        pickupCounty: 'Franklin County',
+        destinationCounty: 'Franklin County',
+      };
+    }
+
+    // PRIORITY 3: Fall back to Google Geocoding API
+    console.log('🌐 No override matched - using Google Geocoding API');
+
+    // Check pickup county via Google API
     const pickupResponse = await fetch(
       `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(pickup)}&key=${GOOGLE_MAPS_API_KEY}`
     );
     const pickupData = await pickupResponse.json();
-    
-    // Check destination county
+
+    // Check destination county via Google API
     const destinationResponse = await fetch(
       `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(destination)}&key=${GOOGLE_MAPS_API_KEY}`
     );
     const destinationData = await destinationResponse.json();
-    
+
     let pickupCounty = 'Unknown';
     let destinationCounty = 'Unknown';
-    
+
     if (pickupData.status === 'OK' && pickupData.results[0]) {
-      const county = pickupData.results[0].address_components.find(c => 
+      const county = pickupData.results[0].address_components.find(c =>
         c.types.includes('administrative_area_level_2')
       );
       pickupCounty = county?.long_name || 'Unknown';
     }
-    
+
     if (destinationData.status === 'OK' && destinationData.results[0]) {
-      const county = destinationData.results[0].address_components.find(c => 
+      const county = destinationData.results[0].address_components.find(c =>
         c.types.includes('administrative_area_level_2')
       );
       destinationCounty = county?.long_name || 'Unknown';
     }
-    
+
     const pickupInFranklin = pickupCounty.includes('Franklin');
     const destinationInFranklin = destinationCounty.includes('Franklin');
-    
+
     // If EITHER address is outside Franklin County, use $4/mile
     const isInFranklinCounty = pickupInFranklin && destinationInFranklin;
-    
+
     // Count counties out
     let countiesOut = 0;
     if (!pickupInFranklin) countiesOut++;
     if (!destinationInFranklin && destinationCounty !== pickupCounty) countiesOut++;
-    
+
+    console.log('📊 Google API Result:', { pickupCounty, destinationCounty, isInFranklinCounty, countiesOut });
+
     return {
       isInFranklinCounty,
       countiesOut,
@@ -179,7 +256,8 @@ export async function checkFranklinCountyStatus(pickup, destination) {
     return {
       isInFranklinCounty: true,
       countiesOut: 0,
-      details: 'Error checking county'
+      pickupCounty: 'Unknown (error)',
+      destinationCounty: 'Unknown (error)',
     };
   }
 }
