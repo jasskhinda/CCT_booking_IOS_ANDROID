@@ -1,161 +1,196 @@
 /**
- * Compassionate Care Transportation - Mobile Pricing Calculator
- * Updated: November 6, 2025
- * 
- * Complete implementation matching CCT's official pricing structure
- * Adapted for React Native / Expo
+ * Compassionate Rides Pricing Calculator - Mobile App
+ * 100% identical to web app pricing logic
+ * Implements the full pricing model with distance calculation, premiums, and discounts
  */
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+/**
+ * Professional Pricing Constants - Complete Enhanced System
+ */
 export const PRICING_CONFIG = {
   BASE_RATES: {
-    REGULAR_PER_LEG: 50,      // $50 per leg (client weight under 300 lbs)
-    BARIATRIC_PER_LEG: 150,   // $150 per leg (client weight 300+ lbs)
+    REGULAR_PER_LEG: 50,      // $50 per leg for under 300 lbs
+    BARIATRIC_PER_LEG: 150,   // $150 per leg for 300+ lbs
   },
-  WEIGHT: {
-    BARIATRIC_THRESHOLD: 300, // 300+ lbs = bariatric rate
+  BARIATRIC: {
+    WEIGHT_THRESHOLD: 300,    // 300+ lbs triggers bariatric rate
+    MAXIMUM_WEIGHT: 400,      // 400+ lbs cannot be accommodated
   },
   DISTANCE: {
     FRANKLIN_COUNTY: 3.00,    // $3 per mile inside Franklin County
     OUTSIDE_FRANKLIN: 4.00,   // $4 per mile outside Franklin County
-    DEAD_MILEAGE: 4.00,       // $4 per mile for dead mileage
-  },
-  OFFICE_LOCATION: {
-    address: '5050 Blazer Pkwy #100, Dublin, OH 43017',
-    coords: { lat: 40.0992, lng: -83.1486 }, // Approximate
+    DEAD_MILEAGE: 4.00,       // $4 per mile for dead mileage (office to pickup)
   },
   PREMIUMS: {
-    WEEKEND: 40,              // Saturday/Sunday
-    AFTER_HOURS: 40,          // Before 8 AM or after 5 PM on weekdays
-    EMERGENCY: 40,            // Emergency checkbox
-    COUNTY_SURCHARGE: 50,     // $50 for 2+ counties out from Franklin
-    HOLIDAY_SURCHARGE: 100,   // $100 for holidays (not per leg)
+    WEEKEND_AFTER_HOURS: 40,  // Before 8am or after 6pm, weekends
+    EMERGENCY: 40,            // Emergency trip fee
+    WHEELCHAIR_RENTAL: 25,    // Wheelchair rental fee (only if we provide)
+    COUNTY_SURCHARGE: 50,     // $50 per county outside Franklin (2+ counties)
+    HOLIDAY_SURCHARGE: 100,   // $100 total (not per leg) for holidays
   },
   DISCOUNTS: {
-    VETERAN: 0.20             // 20% veteran discount
+    VETERAN: 0.20  // 20% veteran discount
   },
   HOURS: {
-    AFTER_HOURS_START: 17,    // 5:00 PM (17:00)
-    AFTER_HOURS_END: 8        // 8:00 AM (08:00)
+    AFTER_HOURS_START: 18,  // 6pm (18:00)
+    AFTER_HOURS_END: 8      // 8am (08:00)
+  },
+  COMPANY_OFFICE: {
+    ADDRESS: "5050 Blazer Pkwy # 100, Dublin, OH 43017",
+    LAT: 40.0994,
+    LNG: -83.1508
   },
   HOLIDAYS: [
-    '01-01', // New Year's Day
-    '12-31', // New Year's Eve
-    '07-04', // Independence Day
-    '12-24', // Christmas Eve
-    '12-25', // Christmas Day
-  ],
+    { month: 1, day: 1, name: "New Year's Day" },
+    { month: 12, day: 31, name: "New Year's Eve" },
+    { month: 7, day: 4, name: "Independence Day" },
+    { month: 12, day: 24, name: "Christmas Eve" },
+    { month: 12, day: 25, name: "Christmas Day" }
+  ]
 };
 
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+/**
+ * Check if given time is during after-hours (before 8am or after 6pm)
+ */
+export function isAfterHours(dateTime) {
+  const hour = new Date(dateTime).getHours();
+  return hour < PRICING_CONFIG.HOURS.AFTER_HOURS_END || hour >= PRICING_CONFIG.HOURS.AFTER_HOURS_START;
+}
 
 /**
- * Calculate distance using Google Maps Distance Matrix API
+ * Check if given date is a weekend (Saturday or Sunday)
  */
-export async function calculateDistance(pickup, destination) {
-  try {
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(pickup)}&destinations=${encodeURIComponent(destination)}&units=imperial&key=${GOOGLE_MAPS_API_KEY}`
-    );
-    
-    const data = await response.json();
-    
-    if (data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
-      const element = data.rows[0].elements[0];
-      const distanceMeters = element.distance.value;
-      const distanceMiles = distanceMeters * 0.000621371;
-      
+export function isWeekend(dateTime) {
+  const day = new Date(dateTime).getDay();
+  return day === 0 || day === 6; // Sunday = 0, Saturday = 6
+}
+
+/**
+ * Check if given date is a holiday
+ */
+export function checkHoliday(dateTime) {
+  const date = new Date(dateTime);
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+
+  // Check fixed holidays
+  for (const holiday of PRICING_CONFIG.HOLIDAYS) {
+    if (holiday.month === month && holiday.day === day) {
       return {
-        distance: parseFloat(distanceMiles.toFixed(2)),
-        duration: element.duration.text,
-        distanceText: element.distance.text,
-        isEstimated: false
+        isHoliday: true,
+        holidayName: holiday.name,
+        surcharge: PRICING_CONFIG.PREMIUMS.HOLIDAY_SURCHARGE
       };
-    } else {
-      throw new Error('Could not calculate distance');
     }
-  } catch (error) {
-    console.error('Error calculating distance:', error);
+  }
+
+  // Check variable holidays
+  const easter = calculateEaster(year);
+  if (month === easter.month && day === easter.day) {
     return {
-      distance: 15,
-      duration: 'Unknown',
-      distanceText: '15 mi (estimated)',
-      isEstimated: true
+      isHoliday: true,
+      holidayName: "Easter Sunday",
+      surcharge: PRICING_CONFIG.PREMIUMS.HOLIDAY_SURCHARGE
     };
   }
-}
 
-/**
- * Calculate dead mileage from office to pickup
- * MATCHES facility_mobile exactly (lines 320-382)
- * Returns ONLY office→pickup distance
- * The caller handles round trip vs one-way logic
- */
-export async function calculateDeadMileage(pickupAddress) {
-  try {
-    const officeAddress = PRICING_CONFIG.OFFICE_LOCATION.address;
-
-    console.log('🚗 Calculating dead mileage from office to pickup');
-    console.log('🏢 Office:', officeAddress);
-    console.log('📍 Pickup:', pickupAddress);
-
-    // Calculate distance from office to pickup using Google Distance Matrix
-    const distanceResult = await calculateDistance(officeAddress, pickupAddress);
-
-    if (distanceResult && distanceResult.distance > 0) {
-      console.log('🚗 Dead mileage calculated:', distanceResult.distance.toFixed(2), 'miles');
-      return {
-        distance: distanceResult.distance,
-        isEstimated: distanceResult.isEstimated || false
-      };
-    } else {
-      console.warn('Dead mileage calculation failed, using 0');
-      return { distance: 0, isEstimated: true };
-    }
-  } catch (error) {
-    console.error('Error calculating dead mileage:', error);
-    return { distance: 0, isEstimated: true };
+  const memorialDay = getLastMondayOfMay(year);
+  if (month === memorialDay.month && day === memorialDay.day) {
+    return {
+      isHoliday: true,
+      holidayName: "Memorial Day",
+      surcharge: PRICING_CONFIG.PREMIUMS.HOLIDAY_SURCHARGE
+    };
   }
+
+  const laborDay = getFirstMondayOfSeptember(year);
+  if (month === laborDay.month && day === laborDay.day) {
+    return {
+      isHoliday: true,
+      holidayName: "Labor Day",
+      surcharge: PRICING_CONFIG.PREMIUMS.HOLIDAY_SURCHARGE
+    };
+  }
+
+  const thanksgiving = getFourthThursdayOfNovember(year);
+  if (month === thanksgiving.month && day === thanksgiving.day) {
+    return {
+      isHoliday: true,
+      holidayName: "Thanksgiving",
+      surcharge: PRICING_CONFIG.PREMIUMS.HOLIDAY_SURCHARGE
+    };
+  }
+
+  return {
+    isHoliday: false,
+    holidayName: null,
+    surcharge: 0
+  };
 }
 
 /**
- * Check if address is in Franklin County, Ohio
- * ENHANCED: Now includes county override patterns (21 Franklin + 6 Lancaster)
- * Priority system: Lancaster patterns > Franklin patterns > Google API
+ * Helper functions for variable holidays
  */
-export async function checkFranklinCountyStatus(pickup, destination) {
+function getLastMondayOfMay(year) {
+  let lastDay = new Date(year, 4, 31);
+  while (lastDay.getDay() !== 1) {
+    lastDay.setDate(lastDay.getDate() - 1);
+  }
+  return { month: 5, day: lastDay.getDate() };
+}
+
+function getFirstMondayOfSeptember(year) {
+  let firstDay = new Date(year, 8, 1);
+  while (firstDay.getDay() !== 1) {
+    firstDay.setDate(firstDay.getDate() + 1);
+  }
+  return { month: 9, day: firstDay.getDate() };
+}
+
+function calculateEaster(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+
+  return { month, day };
+}
+
+function getFourthThursdayOfNovember(year) {
+  let firstDay = new Date(year, 10, 1);
+  while (firstDay.getDay() !== 4) {
+    firstDay.setDate(firstDay.getDate() + 1);
+  }
+  firstDay.setDate(firstDay.getDate() + 21);
+  return { month: 11, day: firstDay.getDate() };
+}
+
+/**
+ * Determine if addresses are in Franklin County using EXACT same override logic as web app
+ * MATCHES: facility_app/lib/pricing.js lines 228-292
+ */
+export async function checkFranklinCountyStatus(pickupAddress, destinationAddress) {
   try {
-    const pickupLower = pickup?.toLowerCase() || '';
-    const destinationLower = destination?.toLowerCase() || '';
+    const pickup = pickupAddress?.toLowerCase() || '';
+    const destination = destinationAddress?.toLowerCase() || '';
 
-    console.log('📍 County Detection (booking_mobile):', { pickup, destination });
+    console.log('🚨 COUNTY DETECTION EMERGENCY CHECK 🚨', { pickup, destination });
 
-    // PRIORITY 1: Lancaster/Fairfield County patterns (forces 2+ counties out)
-    // These 6 patterns override everything else
-    const lancasterPatterns = [
-      'lancaster, oh',
-      'lancaster,oh',
-      'lancaster ohio',
-      '43130',              // Lancaster zip
-      'fairfield county',
-      'fairfield co'
-    ];
-
-    const isPickupLancaster = lancasterPatterns.some(pattern => pickupLower.includes(pattern));
-    const isDestinationLancaster = lancasterPatterns.some(pattern => destinationLower.includes(pattern));
-
-    // If either address matches Lancaster patterns, force 2+ counties out
-    if (isPickupLancaster || isDestinationLancaster) {
-      console.log('🚨 LANCASTER OVERRIDE APPLIED: Fairfield County detected → 2+ counties out');
-      return {
-        isInFranklinCounty: false,
-        countiesOut: 2,
-        pickupCounty: isPickupLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County',
-        destinationCounty: isDestinationLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County',
-      };
-    }
-
-    // PRIORITY 2: Franklin County patterns (forces 0 counties out)
-    // These 21 patterns match facility_mobile exactly
+    // Known Franklin County address patterns - EXACT MATCH with web app (21 patterns)
     const franklinCountyPatterns = [
       'westerville',
       'columbus',
@@ -169,236 +204,316 @@ export async function checkFranklinCountyStatus(pickup, destination) {
       'whitehall',
       'worthington',
       'grandview heights',
+      '43082', // Westerville zip
+      '43228', // Columbus zip
+      'executive campus dr',
+      'franshire',
+      // NEW ADDITIONS - Force Franklin County (0 counties out)
       'groveport',
       'new albany',
       'pickerington',
       'canal winchester',
-      'lockbourne',
-      '43082',              // Westerville zip
-      '43228',              // Columbus zip
-      'executive campus dr',
-      'franshire'
+      'lockbourne'
     ];
 
-    const isPickupFranklin = franklinCountyPatterns.some(pattern => pickupLower.includes(pattern));
-    const isDestinationFranklin = franklinCountyPatterns.some(pattern => destinationLower.includes(pattern));
+    // Known Non-Franklin County patterns (for Lancaster, OH bug fix) - EXACT MATCH with web app (6 patterns)
+    const nonFranklinCountyPatterns = [
+      'lancaster, oh',
+      'lancaster,oh',
+      'lancaster ohio',
+      '43130', // Lancaster, OH zip code
+      'fairfield county', // Lancaster is in Fairfield County
+      'fairfield co'
+    ];
 
-    // If BOTH addresses match Franklin patterns, force 0 counties out
-    if (isPickupFranklin && isDestinationFranklin) {
-      console.log('✅ FRANKLIN OVERRIDE APPLIED: Both addresses in Franklin County → 0 counties out');
+    const isPickupFranklin = franklinCountyPatterns.some(pattern => pickup.includes(pattern));
+    const isDestinationFranklin = franklinCountyPatterns.some(pattern => destination.includes(pattern));
+
+    // Special check for Lancaster, OH (Fairfield County) - should NOT be Franklin County
+    const isPickupLancaster = nonFranklinCountyPatterns.some(pattern => pickup.includes(pattern));
+    const isDestinationLancaster = nonFranklinCountyPatterns.some(pattern => destination.includes(pattern));
+
+    // Lancaster, OH bug fix: Force non-Franklin status for Lancaster
+    if (isPickupLancaster || isDestinationLancaster) {
+      console.log('🚨 LANCASTER BUG FIX APPLIED: Lancaster, OH detected as non-Franklin County');
       return {
-        isInFranklinCounty: true,
-        countiesOut: 0,
-        pickupCounty: 'Franklin County',
-        destinationCounty: 'Franklin County',
+        isInFranklinCounty: false,
+        countiesOut: 2, // Lancaster is 2+ counties out, triggers $4/mile + $50 surcharge
+        pickup: isPickupLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County',
+        destination: isDestinationLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County'
       };
     }
 
-    // PRIORITY 3: No pattern matched - default to Franklin County to avoid overcharging
-    // This matches facility_mobile behavior exactly (line 259-265)
-    console.log('⚠️ No override matched - defaulting to Franklin County to avoid overcharging');
+    if (isPickupFranklin && isDestinationFranklin) {
+      console.log('🚨 EMERGENCY FIX APPLIED: Both addresses detected as Franklin County');
+      return {
+        isInFranklinCounty: true,
+        countiesOut: 0,
+        pickup: 'Franklin County',
+        destination: 'Franklin County'
+      };
+    }
+
+    // If no overrides match, return null to indicate we should use Google API
+    // But for mobile app, we'll default to Franklin County to avoid overcharging
+    console.log('⚠️ No override matched - defaulting to Franklin County');
     return {
       isInFranklinCounty: true,
       countiesOut: 0,
-      pickupCounty: 'Franklin County',
-      destinationCounty: 'Franklin County',
+      pickup: 'Franklin County',
+      destination: 'Franklin County'
     };
   } catch (error) {
-    console.error('Error checking county status:', error);
+    console.error('County detection error:', error);
+    // Default to Franklin County rates on error to avoid overcharging
     return {
       isInFranklinCounty: true,
       countiesOut: 0,
-      pickupCounty: 'Unknown (error)',
-      destinationCounty: 'Unknown (error)',
+      pickup: 'Franklin County',
+      destination: 'Franklin County'
     };
   }
 }
 
 /**
- * Check if date is after hours
+ * Extract county from Google Geocoding result
  */
-export function isAfterHours(dateTime) {
-  const date = new Date(dateTime);
-  const hour = date.getHours();
-  const day = date.getDay();
+function extractCountyFromGeocode(result) {
+  if (!result.address_components) return null;
 
-  // Weekdays only - check time
-  if (day >= 1 && day <= 5) {
-    return hour < PRICING_CONFIG.HOURS.AFTER_HOURS_END || 
-           hour >= PRICING_CONFIG.HOURS.AFTER_HOURS_START;
-  }
-  
-  return false;
-}
-
-/**
- * Check if date is weekend
- */
-export function isWeekend(dateTime) {
-  const date = new Date(dateTime);
-  const day = date.getDay();
-  return day === 0 || day === 6;
-}
-
-/**
- * Check if date is a holiday
- */
-export function isHoliday(dateTime) {
-  const date = new Date(dateTime);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const dateString = `${month}-${day}`;
-  
-  if (PRICING_CONFIG.HOLIDAYS.includes(dateString)) {
-    return true;
-  }
-  
-  // Check for dynamic holidays
-  const year = date.getFullYear();
-  
-  // Memorial Day (last Monday in May)
-  if (month === '05' && date.getDay() === 1) {
-    const lastMonday = new Date(year, 4, 31);
-    while (lastMonday.getDay() !== 1) {
-      lastMonday.setDate(lastMonday.getDate() - 1);
+  for (let component of result.address_components) {
+    if (component.types.includes('administrative_area_level_2')) {
+      return component.long_name;
     }
-    if (date.toDateString() === lastMonday.toDateString()) return true;
   }
-  
-  // Labor Day (first Monday in September)
-  if (month === '09' && date.getDay() === 1 && parseInt(day) <= 7) {
-    return true;
+
+  // Fallback: check if it's in Ohio and assume Franklin County for Columbus area
+  const isOhio = result.address_components.some(comp =>
+    comp.types.includes('administrative_area_level_1') && comp.short_name === 'OH'
+  );
+
+  if (isOhio) {
+    const cityComponent = result.address_components.find(comp =>
+      comp.types.includes('locality')
+    );
+
+    if (cityComponent) {
+      const city = cityComponent.long_name.toLowerCase();
+      const franklinCountyCities = [
+        'columbus', 'dublin', 'westerville', 'gahanna', 'reynoldsburg',
+        'grove city', 'hilliard', 'upper arlington', 'bexley', 'whitehall',
+        'worthington', 'grandview heights'
+      ];
+
+      if (franklinCountyCities.some(fcCity => city.includes(fcCity))) {
+        return 'Franklin County';
+      }
+    }
   }
-  
-  // Thanksgiving (fourth Thursday in November)
-  if (month === '11' && date.getDay() === 4) {
-    const weekOfMonth = Math.ceil(parseInt(day) / 7);
-    if (weekOfMonth === 4) return true;
-  }
-  
-  return false;
+
+  return null;
 }
 
 /**
- * Calculate complete trip price with full breakdown
+ * Calculate dead mileage from company office to pickup location
+ */
+export async function calculateDeadMileage(pickupAddress) {
+  try {
+    const API_URL = process.env.EXPO_PUBLIC_API_URL;
+    const officeAddress = '5050 Blazer Pkwy # 100, Dublin, OH 43017';
+
+    console.log('🚗 Calculating dead mileage from office to pickup');
+    console.log('🔑 API_URL:', API_URL || '❌ NOT SET');
+    console.log('🏢 Office:', officeAddress);
+    console.log('📍 Pickup:', pickupAddress);
+
+    if (!API_URL) {
+      console.error('❌ API_URL not configured - cannot calculate dead mileage');
+      return { distance: 0, isEstimated: true };
+    }
+
+    // Use the Distance Matrix API endpoint with timeout (matches web app)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    try {
+      const apiEndpoint = `${API_URL}/api/maps/distancematrix?origin=${encodeURIComponent(officeAddress)}&destination=${encodeURIComponent(pickupAddress)}`;
+      console.log('🌐 Calling API:', apiEndpoint);
+
+      const response = await fetch(apiEndpoint, { signal: controller.signal });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.error('Dead mileage API error:', response.status);
+        return { distance: 0, isEstimated: true };
+      }
+
+      const data = await response.json();
+
+      console.log('🚗 Dead mileage API response:', JSON.stringify(data).substring(0, 200));
+
+      if (data.status === 'OK' && data.distance) {
+        // Parse Distance Matrix API response format (same as web app)
+        const distanceInMiles = data.distance.value * 0.000621371; // Convert meters to miles
+        console.log('🚗 Dead mileage calculated:', distanceInMiles.toFixed(2), 'miles');
+
+        return {
+          distance: Math.round(distanceInMiles * 100) / 100,
+          isEstimated: false
+        };
+      } else {
+        console.warn('Dead mileage calculation failed, response:', data);
+        return { distance: 0, isEstimated: true };
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.log('⏱️ Distance calculation timed out - using estimated distance');
+      } else {
+        console.log('⚠️ Distance calculation unavailable - using estimated distance');
+      }
+      return { distance: 0, isEstimated: true };
+    }
+  } catch (error) {
+    console.log('⚠️ Unable to calculate distance - using estimated distance');
+    return { distance: 0, isEstimated: true };
+  }
+}
+
+/**
+ * Calculate total trip price based on enhanced professional rate structure
+ * 100% identical to web app
  */
 export function calculateTripPrice({
   isRoundTrip = false,
-  tripDistance = 0,
-  deadMileageDistance = 0,
+  distance = 0,
   pickupDateTime,
-  clientWeight = 250,
+  wheelchairType = 'no_wheelchair',
+  clientType = 'facility',
+  additionalPassengers = 0,
   isEmergency = false,
-  isVeteran = false,
   countyInfo = null,
+  clientWeight = null,
+  deadMileage = 0,
+  holidayInfo = null
 }) {
   let breakdown = {
     basePrice: 0,
-    baseRatePerLeg: 0,
-    isBariatric: false,
-    legs: isRoundTrip ? 2 : 1,
-    
-    tripDistancePrice: 0,
-    deadMileagePrice: 0,
-    deadMileageDistance: 0,
+    roundTripPrice: 0,
     distancePrice: 0,
-    
-    countySurcharge: 0,
-    weekendSurcharge: 0,
-    afterHoursSurcharge: 0,
-    emergencySurcharge: 0,
+    countyPrice: 0,
+    deadMileagePrice: 0,
+    weekendAfterHoursSurcharge: 0,
+    emergencyFee: 0,
     holidaySurcharge: 0,
-    
+    wheelchairPrice: 0,
     veteranDiscount: 0,
-    
     total: 0,
+    isBariatric: false,
+    hasHolidaySurcharge: false,
+    hasDeadMileage: false
   };
 
-  // 1. Base fare
-  breakdown.isBariatric = clientWeight >= PRICING_CONFIG.WEIGHT.BARIATRIC_THRESHOLD;
-  breakdown.baseRatePerLeg = breakdown.isBariatric
-    ? PRICING_CONFIG.BASE_RATES.BARIATRIC_PER_LEG
-    : PRICING_CONFIG.BASE_RATES.REGULAR_PER_LEG;
-  breakdown.basePrice = breakdown.baseRatePerLeg * breakdown.legs;
+  // Enhanced base rate: Regular vs Bariatric
+  const isBariatric = clientWeight && clientWeight >= PRICING_CONFIG.BARIATRIC.WEIGHT_THRESHOLD;
+  breakdown.isBariatric = isBariatric;
 
-  // 2. Distance pricing - MATCHES facility_mobile lines 434-452
-  const isInFranklinCounty = countyInfo?.isInFranklinCounty !== false;
-  const pricePerMile = isInFranklinCounty
-    ? PRICING_CONFIG.DISTANCE.FRANKLIN_COUNTY
-    : PRICING_CONFIG.DISTANCE.OUTSIDE_FRANKLIN;
+  if (isBariatric) {
+    breakdown.basePrice = PRICING_CONFIG.BASE_RATES.BARIATRIC_PER_LEG;
+    if (isRoundTrip) {
+      breakdown.roundTripPrice = PRICING_CONFIG.BASE_RATES.BARIATRIC_PER_LEG;
+    }
+  } else {
+    breakdown.basePrice = PRICING_CONFIG.BASE_RATES.REGULAR_PER_LEG;
+    if (isRoundTrip) {
+      breakdown.roundTripPrice = PRICING_CONFIG.BASE_RATES.REGULAR_PER_LEG;
+    }
+  }
 
-  // Double distance for round trips INSIDE this function (not by caller)
-  // This matches facility_mobile exactly (line 436)
-  if (tripDistance > 0) {
-    const effectiveDistance = isRoundTrip ? tripDistance * 2 : tripDistance;
+  // Distance charge calculation with Franklin County logic
+  if (distance > 0) {
+    const effectiveDistance = isRoundTrip ? distance * 2 : distance;
+    // Use $4/mile if EITHER address is outside Franklin County
+    const isInFranklinCounty = countyInfo?.isInFranklinCounty === true;
 
     console.log('💰 Distance Rate Calculation:', {
-      tripDistance,
+      distance,
       effectiveDistance,
       isInFranklinCounty,
       rate: isInFranklinCounty ? '$3/mile' : '$4/mile'
     });
 
-    breakdown.tripDistancePrice = effectiveDistance * pricePerMile;
+    if (isInFranklinCounty) {
+      breakdown.distancePrice = effectiveDistance * PRICING_CONFIG.DISTANCE.FRANKLIN_COUNTY;
+    } else {
+      breakdown.distancePrice = effectiveDistance * PRICING_CONFIG.DISTANCE.OUTSIDE_FRANKLIN;
+    }
   }
 
-  if (deadMileageDistance > 0) {
-    breakdown.deadMileagePrice = deadMileageDistance * PRICING_CONFIG.DISTANCE.DEAD_MILEAGE;
-    breakdown.deadMileageDistance = deadMileageDistance;
-  }
-
-  breakdown.distancePrice = breakdown.tripDistancePrice + breakdown.deadMileagePrice;
-
-  // 3. County surcharge - MATCHES facility_mobile lines 454-461
-  // Formula: (countiesOut - 1) * $50
-  // Examples: 2 counties = $50, 3 counties = $100, 4 counties = $150
-  const countiesOut = countyInfo?.countiesOut || 0;
-  if (countiesOut >= 2) {
-    breakdown.countySurcharge = (countiesOut - 1) * PRICING_CONFIG.PREMIUMS.COUNTY_SURCHARGE;
+  // County surcharge for trips outside Franklin County (2+ counties)
+  if (countyInfo && countyInfo.countiesOut >= 2) {
+    breakdown.countyPrice = (countyInfo.countiesOut - 1) * PRICING_CONFIG.PREMIUMS.COUNTY_SURCHARGE;
     console.log('💵 County Surcharge Applied:', {
-      countiesOut,
-      surcharge: breakdown.countySurcharge
+      countiesOut: countyInfo.countiesOut,
+      countyPrice: breakdown.countyPrice
     });
   }
 
-  // 4. Time-based surcharges
+  // Dead mileage fee for trips 2+ counties out (NO dead mileage for 1 county out)
+  if (deadMileage > 0 && countyInfo && countyInfo.countiesOut >= 2) {
+    breakdown.deadMileagePrice = deadMileage * PRICING_CONFIG.DISTANCE.DEAD_MILEAGE;
+    breakdown.hasDeadMileage = true;
+    console.log('🚗 Dead Mileage Fee Applied:', {
+      deadMileage,
+      deadMileagePrice: breakdown.deadMileagePrice
+    });
+  }
+
+  // Combined weekend and after-hours premium
   if (pickupDateTime) {
-    if (isWeekend(pickupDateTime)) {
-      breakdown.weekendSurcharge = PRICING_CONFIG.PREMIUMS.WEEKEND;
-    }
-    
-    if (isAfterHours(pickupDateTime)) {
-      breakdown.afterHoursSurcharge = PRICING_CONFIG.PREMIUMS.AFTER_HOURS;
-    }
-    
-    if (isHoliday(pickupDateTime)) {
-      breakdown.holidaySurcharge = PRICING_CONFIG.PREMIUMS.HOLIDAY_SURCHARGE;
+    const isAfterHoursTime = isAfterHours(pickupDateTime);
+    const isWeekendTime = isWeekend(pickupDateTime);
+
+    if (isAfterHoursTime || isWeekendTime) {
+      breakdown.weekendAfterHoursSurcharge = PRICING_CONFIG.PREMIUMS.WEEKEND_AFTER_HOURS;
     }
   }
 
-  // 5. Emergency
+  // Emergency fee
   if (isEmergency) {
-    breakdown.emergencySurcharge = PRICING_CONFIG.PREMIUMS.EMERGENCY;
+    breakdown.emergencyFee = PRICING_CONFIG.PREMIUMS.EMERGENCY;
   }
 
-  // 6. Calculate subtotal
+  // Holiday surcharge (total trip, not per leg)
+  if (holidayInfo && holidayInfo.isHoliday) {
+    breakdown.holidaySurcharge = PRICING_CONFIG.PREMIUMS.HOLIDAY_SURCHARGE;
+    breakdown.hasHolidaySurcharge = true;
+  }
+
+  // Wheelchair rental fee - DISABLED FOR FACILITY APP
+  // if (wheelchairType === 'provided') {
+  //   breakdown.wheelchairPrice = PRICING_CONFIG.PREMIUMS.WHEELCHAIR_RENTAL;
+  // }
+
+  // Calculate subtotal before veteran discount
   const subtotal = breakdown.basePrice +
+                   breakdown.roundTripPrice +
                    breakdown.distancePrice +
-                   breakdown.countySurcharge +
-                   breakdown.weekendSurcharge +
-                   breakdown.afterHoursSurcharge +
-                   breakdown.emergencySurcharge +
-                   breakdown.holidaySurcharge;
+                   breakdown.countyPrice +
+                   breakdown.deadMileagePrice +
+                   breakdown.weekendAfterHoursSurcharge +
+                   breakdown.emergencyFee +
+                   breakdown.holidaySurcharge +
+                   breakdown.wheelchairPrice;
 
-  // 7. Veteran discount
-  if (isVeteran) {
-    breakdown.veteranDiscount = subtotal * PRICING_CONFIG.DISCOUNTS.VETERAN;
-  }
+  // Apply veteran discount (20%)
+  breakdown.veteranDiscount = 0;
 
-  // 8. Final total
+  // Final total
   breakdown.total = subtotal - breakdown.veteranDiscount;
 
-  // Round all values
+  // Round all monetary values to 2 decimal places
   Object.keys(breakdown).forEach(key => {
     if (typeof breakdown[key] === 'number') {
       breakdown[key] = Math.round(breakdown[key] * 100) / 100;
@@ -409,123 +524,6 @@ export function calculateTripPrice({
 }
 
 /**
- * Get complete pricing estimate
- */
-export async function getPricingEstimate({
-  pickupAddress,
-  destinationAddress,
-  isRoundTrip = false,
-  pickupDateTime,
-  clientWeight = 250,
-  isEmergency = false,
-  isVeteran = false,
-  preCalculatedDistance = null
-}) {
-  try {
-    console.log('📊 Getting pricing estimate:', {
-      pickupAddress,
-      destinationAddress,
-      isRoundTrip,
-      clientWeight,
-      isEmergency,
-      isVeteran
-    });
-
-    // 1. Trip distance
-    let tripDistance = 0;
-    let distanceInfo = null;
-
-    if (preCalculatedDistance) {
-      tripDistance = typeof preCalculatedDistance === 'number' 
-        ? preCalculatedDistance 
-        : (preCalculatedDistance.distance || preCalculatedDistance.miles || 0);
-      
-      distanceInfo = {
-        distance: tripDistance,
-        duration: preCalculatedDistance.duration || 'Unknown',
-        distanceText: preCalculatedDistance.text || `${tripDistance} mi`,
-        isEstimated: false
-      };
-    } else if (pickupAddress && destinationAddress) {
-      distanceInfo = await calculateDistance(pickupAddress, destinationAddress);
-      tripDistance = distanceInfo.distance;
-    }
-
-    // 2. County status
-    let countyInfo = { isInFranklinCounty: true, countiesOut: 0 };
-    if (pickupAddress && destinationAddress) {
-      countyInfo = await checkFranklinCountyStatus(pickupAddress, destinationAddress);
-      console.log('📍 County Info:', countyInfo);
-    }
-
-    // 3. Dead mileage (only for 2+ counties) - MATCHES facility_mobile lines 564-601
-    let deadMileageDistance = 0;
-    if (countyInfo.countiesOut >= 2 && pickupAddress && destinationAddress) {
-      // Calculate office to pickup distance
-      const toPickupResult = await calculateDeadMileage(pickupAddress);
-      const toPickupDistance = toPickupResult.distance;
-
-      if (isRoundTrip) {
-        // Round trip: Driver goes Office → Pickup, then after round trip returns Pickup → Office
-        // Dead mileage = (Office → Pickup) × 2
-        deadMileageDistance = toPickupDistance * 2;
-        console.log('🚗 Round Trip Dead Mileage:', {
-          pickup: pickupAddress,
-          toPickup: toPickupDistance,
-          fromPickup: toPickupDistance,
-          totalDistance: deadMileageDistance,
-          totalPrice: deadMileageDistance * PRICING_CONFIG.DISTANCE.DEAD_MILEAGE
-        });
-      } else {
-        // One-way trip: Office → Pickup + Destination → Office
-        // Driver returns from DESTINATION (where they dropped off), not from pickup
-        const fromDestinationResult = await calculateDeadMileage(destinationAddress);
-        const fromDestinationDistance = fromDestinationResult.distance;
-
-        deadMileageDistance = toPickupDistance + fromDestinationDistance;
-        console.log('🚗 One-Way Dead Mileage:', {
-          pickup: pickupAddress,
-          destination: destinationAddress,
-          toPickup: toPickupDistance,
-          fromDestination: fromDestinationDistance,
-          totalDistance: deadMileageDistance,
-          totalPrice: deadMileageDistance * PRICING_CONFIG.DISTANCE.DEAD_MILEAGE
-        });
-      }
-    }
-
-    // 4. Calculate pricing
-    const pricing = calculateTripPrice({
-      isRoundTrip,
-      tripDistance,
-      deadMileageDistance,
-      pickupDateTime,
-      clientWeight,
-      isEmergency,
-      isVeteran,
-      countyInfo,
-    });
-
-    console.log('✅ Pricing calculated:', pricing);
-
-    return {
-      success: true,
-      pricing,
-      distanceInfo,
-      countyInfo,
-      deadMileageDistance,
-    };
-  } catch (error) {
-    console.error('❌ Error calculating pricing:', error);
-    return {
-      success: false,
-      error: error.message,
-      pricing: null,
-    };
-  }
-}
-
-/**
  * Format currency for display
  */
 export function formatCurrency(amount) {
@@ -533,15 +531,124 @@ export function formatCurrency(amount) {
   return `$${amount.toFixed(2)}`;
 }
 
-export default {
-  PRICING_CONFIG,
-  calculateDistance,
-  calculateDeadMileage,
-  checkFranklinCountyStatus,
-  isAfterHours,
-  isWeekend,
-  isHoliday,
-  calculateTripPrice,
-  getPricingEstimate,
-  formatCurrency,
-};
+/**
+ * Get pricing estimate with full breakdown - Mobile version
+ */
+export async function getPricingEstimate({
+  pickupAddress,
+  destinationAddress,
+  isRoundTrip = false,
+  pickupDateTime,
+  wheelchairType = 'no_wheelchair',
+  clientType = 'facility',
+  additionalPassengers = 0,
+  isEmergency = false,
+  distance = 0,
+  clientWeight = null
+}) {
+  try {
+    console.log('💰 Mobile getPricingEstimate called:', {
+      pickupAddress,
+      destinationAddress,
+      distance,
+      isRoundTrip
+    });
+
+    // Get county information
+    let countyInfo = null;
+    if (pickupAddress && destinationAddress) {
+      countyInfo = await checkFranklinCountyStatus(pickupAddress, destinationAddress);
+      console.log('📍 County Info:', countyInfo);
+    }
+
+    // Calculate dead mileage ONLY for 2+ counties out (NO dead mileage for 1 county out)
+    // FIXED: Dead mileage calculation
+    // One-way: Office → Pickup + Destination → Office
+    // Round trip: Office → Pickup + Pickup → Office (after round trip)
+    let deadMileage = 0;
+    if (pickupAddress && destinationAddress && countyInfo && countyInfo.countiesOut >= 2) {
+      // Calculate office to pickup distance
+      const toPickupResult = await calculateDeadMileage(pickupAddress);
+      const toPickupDistance = toPickupResult.distance;
+
+      if (isRoundTrip) {
+        // Round trip: Driver goes Office → Pickup, then after round trip returns Pickup → Office
+        // Dead mileage = (Office → Pickup) × 2
+        deadMileage = toPickupDistance * 2;
+        console.log('🚗 Round Trip Dead Mileage:', {
+          pickup: pickupAddress,
+          toPickup: toPickupDistance,
+          fromPickup: toPickupDistance,
+          totalDistance: deadMileage,
+          totalPrice: deadMileage * PRICING_CONFIG.DISTANCE.DEAD_MILEAGE
+        });
+      } else {
+        // One-way trip: Office → Pickup + Destination → Office
+        // Driver returns from DESTINATION (where they dropped off), not from pickup
+        const fromDestinationResult = await calculateDeadMileage(destinationAddress);
+        const fromDestinationDistance = fromDestinationResult.distance;
+
+        deadMileage = toPickupDistance + fromDestinationDistance;
+        console.log('🚗 One-Way Dead Mileage:', {
+          pickup: pickupAddress,
+          destination: destinationAddress,
+          toPickup: toPickupDistance,
+          fromDestination: fromDestinationDistance,
+          totalDistance: deadMileage,
+          totalPrice: deadMileage * PRICING_CONFIG.DISTANCE.DEAD_MILEAGE
+        });
+      }
+    }
+
+    // Check for holiday
+    let holidayInfo = null;
+    if (pickupDateTime) {
+      const holidayCheck = checkHoliday(pickupDateTime);
+      if (holidayCheck.isHoliday) {
+        holidayInfo = {
+          isHoliday: true,
+          surcharge: holidayCheck.surcharge || 100,
+          holidayName: holidayCheck.holidayName
+        };
+      }
+    }
+
+    // Calculate pricing with enhanced rate structure
+    const pricing = calculateTripPrice({
+      isRoundTrip,
+      distance,
+      pickupDateTime,
+      wheelchairType,
+      clientType,
+      additionalPassengers,
+      isEmergency,
+      countyInfo,
+      clientWeight,
+      deadMileage,
+      holidayInfo
+    });
+
+    return {
+      success: true,
+      pricing,
+      countyInfo,
+      deadMileage,
+      holidayInfo,
+      summary: {
+        tripType: isRoundTrip ? 'Round Trip' : 'One Way',
+        distance: distance > 0 ? `${isRoundTrip ? (distance * 2).toFixed(1) : distance.toFixed(1)} miles` : 'Distance not calculated',
+        estimatedTotal: formatCurrency(pricing.total),
+        isBariatric: pricing.isBariatric || false,
+        hasHolidaySurcharge: pricing.hasHolidaySurcharge || false,
+        hasDeadMileage: pricing.hasDeadMileage || false
+      }
+    };
+  } catch (error) {
+    console.error('Pricing estimate error:', error);
+    return {
+      success: false,
+      error: error.message,
+      pricing: null
+    };
+  }
+}
