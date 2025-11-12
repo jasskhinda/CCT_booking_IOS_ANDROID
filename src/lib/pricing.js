@@ -412,7 +412,10 @@ export function calculateTripPrice({
     total: 0,
     isBariatric: false,
     hasHolidaySurcharge: false,
-    hasDeadMileage: false
+    hasDeadMileage: false,
+    // Add properties for PricingDisplay component
+    legs: isRoundTrip ? 2 : 1,
+    baseRatePerLeg: 0
   };
 
   // Enhanced base rate: Regular vs Bariatric
@@ -420,11 +423,13 @@ export function calculateTripPrice({
   breakdown.isBariatric = isBariatric;
 
   if (isBariatric) {
+    breakdown.baseRatePerLeg = PRICING_CONFIG.BASE_RATES.BARIATRIC_PER_LEG;
     breakdown.basePrice = PRICING_CONFIG.BASE_RATES.BARIATRIC_PER_LEG;
     if (isRoundTrip) {
       breakdown.roundTripPrice = PRICING_CONFIG.BASE_RATES.BARIATRIC_PER_LEG;
     }
   } else {
+    breakdown.baseRatePerLeg = PRICING_CONFIG.BASE_RATES.REGULAR_PER_LEG;
     breakdown.basePrice = PRICING_CONFIG.BASE_RATES.REGULAR_PER_LEG;
     if (isRoundTrip) {
       breakdown.roundTripPrice = PRICING_CONFIG.BASE_RATES.REGULAR_PER_LEG;
