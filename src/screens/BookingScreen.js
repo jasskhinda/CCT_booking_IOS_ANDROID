@@ -542,9 +542,64 @@ const BookingScreen = ({ navigation }) => {
             destination={destinationCoords}
             apikey={GOOGLE_MAPS_API_KEY}
             strokeWidth={4}
-            strokeColor="#5fbfc0"
-            onReady={(result) => {
+            strokeColor={Platform.OS === 'android' ? '#2563EB' : '#5fbfc0'}
+            onReady={async (result) => {
+              // CRITICAL FIX: Update marker coordinates to match route endpoints
+              // This ensures pins appear exactly where the blue line starts/ends
+              console.log('🗺️ Route ready! Updating marker coordinates to match route endpoints...');
+              console.log('📊 MapViewDirections result:', result);
+              console.log('📍 Current pickup coords:', JSON.stringify(pickupCoords));
+              console.log('📍 Current destination coords:', JSON.stringify(destinationCoords));
+
               fitMapToRoute(pickupCoords, destinationCoords);
+
+              // Use Google Directions API directly to get EXACT route endpoint coordinates
+              try {
+                console.log('🎯 Calling Google Directions API for route endpoint coordinates...');
+                console.log('📍 Pickup:', pickupAddress);
+                console.log('📍 Destination:', destinationAddress);
+
+                const directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(pickupAddress)}&destination=${encodeURIComponent(destinationAddress)}&alternatives=true&mode=driving&units=imperial&departure_time=now&traffic_model=best_guess&key=${GOOGLE_MAPS_API_KEY}`;
+
+                const response = await fetch(directionsUrl);
+                const data = await response.json();
+
+                if (data.status === 'OK' && data.routes && data.routes.length > 0) {
+                  // Find the fastest route (shortest duration)
+                  let fastestRoute = data.routes[0];
+                  let shortestDuration = data.routes[0].legs[0].duration.value;
+
+                  for (let i = 1; i < data.routes.length; i++) {
+                    const routeDuration = data.routes[i].legs[0].duration.value;
+                    if (routeDuration < shortestDuration) {
+                      shortestDuration = routeDuration;
+                      fastestRoute = data.routes[i];
+                    }
+                  }
+
+                  const leg = fastestRoute.legs[0];
+
+                  // CRITICAL FIX: Update marker coordinates to match route start/end locations
+                  const routeStartCoords = {
+                    latitude: leg.start_location.lat,
+                    longitude: leg.start_location.lng
+                  };
+                  const routeEndCoords = {
+                    latitude: leg.end_location.lat,
+                    longitude: leg.end_location.lng
+                  };
+
+                  console.log('📍 Route START location:', routeStartCoords);
+                  console.log('📍 Route END location:', routeEndCoords);
+                  console.log('🔄 Updating marker coordinates to match route endpoints...');
+
+                  setPickupCoords(routeStartCoords);
+                  setDestinationCoords(routeEndCoords);
+                }
+              } catch (error) {
+                console.error('❌ Google Directions API error (marker positioning):', error);
+                // Keep original coordinates on error
+              }
             }}
           />
         )}
