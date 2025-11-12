@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../hooks/useAuth';
 
 // Screens
@@ -22,6 +22,10 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// Brand color
+const BRAND_COLOR = '#5fbfc0';
+const INACTIVE_COLOR = '#1a1a1a';
+
 const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Login" component={LoginScreen} />
@@ -34,8 +38,20 @@ const HomeTabs = () => (
   <Tab.Navigator
     screenOptions={{
       headerShown: false,
-      tabBarActiveTintColor: '#0066cc',
-      tabBarInactiveTintColor: '#666',
+      tabBarActiveTintColor: BRAND_COLOR,
+      tabBarInactiveTintColor: INACTIVE_COLOR,
+      tabBarStyle: {
+        backgroundColor: '#ffffff',
+        borderTopColor: '#e0e0e0',
+        borderTopWidth: 1,
+        paddingBottom: 5,
+        paddingTop: 5,
+        height: 60,
+      },
+      tabBarLabelStyle: {
+        fontSize: 12,
+        fontWeight: '600',
+      },
     }}
   >
     <Tab.Screen
@@ -43,7 +59,13 @@ const HomeTabs = () => (
       component={HomeScreen}
       options={{
         tabBarLabel: 'Home',
-        tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🏠</Text>,
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons
+            name={focused ? 'home' : 'home-outline'}
+            size={24}
+            color={color}
+          />
+        ),
       }}
     />
     <Tab.Screen
@@ -51,7 +73,13 @@ const HomeTabs = () => (
       component={UberLikeBookingScreen}
       options={{
         tabBarLabel: 'Book',
-        tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>📅</Text>,
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons
+            name={focused ? 'calendar' : 'calendar-outline'}
+            size={24}
+            color={color}
+          />
+        ),
       }}
     />
     <Tab.Screen
@@ -59,7 +87,13 @@ const HomeTabs = () => (
       component={TripsScreen}
       options={{
         tabBarLabel: 'My Trips',
-        tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🚗</Text>,
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons
+            name={focused ? 'car' : 'car-outline'}
+            size={24}
+            color={color}
+          />
+        ),
       }}
     />
     <Tab.Screen
@@ -67,7 +101,13 @@ const HomeTabs = () => (
       component={ProfileScreen}
       options={{
         tabBarLabel: 'Profile',
-        tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>👤</Text>,
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons
+            name={focused ? 'person' : 'person-outline'}
+            size={24}
+            color={color}
+          />
+        ),
       }}
     />
   </Tab.Navigator>
