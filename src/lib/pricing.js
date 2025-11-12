@@ -185,12 +185,41 @@ function getFourthThursdayOfNovember(year) {
  */
 export async function checkFranklinCountyStatus(pickupAddress, destinationAddress) {
   try {
+    // PRIORITY SYSTEM: Pattern matching is the FINAL AUTHORITY
+    // This ensures Pickerington, Groveport, etc. are treated as Franklin County
     const pickup = pickupAddress?.toLowerCase() || '';
     const destination = destinationAddress?.toLowerCase() || '';
 
-    console.log('🚨 COUNTY DETECTION EMERGENCY CHECK 🚨', { pickup, destination });
+    console.log('🚨 COUNTY DETECTION CHECK 🚨', {
+      pickup: pickupAddress,
+      destination: destinationAddress
+    });
 
-    // Known Franklin County address patterns - EXACT MATCH with web app (21 patterns)
+    // PRIORITY 1: Lancaster/Fairfield County patterns (HIGHEST - forces 2+ counties out)
+    const nonFranklinCountyPatterns = [
+      'lancaster, oh',
+      'lancaster,oh',
+      'lancaster ohio',
+      '43130', // Lancaster, OH zip code
+      'fairfield county',
+      'fairfield co'
+    ];
+
+    const isPickupLancaster = nonFranklinCountyPatterns.some(pattern => pickup.includes(pattern));
+    const isDestinationLancaster = nonFranklinCountyPatterns.some(pattern => destination.includes(pattern));
+
+    if (isPickupLancaster || isDestinationLancaster) {
+      console.log('✅ LANCASTER OVERRIDE: Fairfield County detected → 2+ counties out');
+      return {
+        isInFranklinCounty: false,
+        countiesOut: 2,
+        pickup: isPickupLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County',
+        destination: isDestinationLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County'
+      };
+    }
+
+    // PRIORITY 2: Franklin County patterns (forces 0 counties out)
+    // These 21 patterns are the FINAL AUTHORITY - no Google API fallback
     const franklinCountyPatterns = [
       'westerville',
       'columbus',
@@ -208,7 +237,7 @@ export async function checkFranklinCountyStatus(pickupAddress, destinationAddres
       '43228', // Columbus zip
       'executive campus dr',
       'franshire',
-      // NEW ADDITIONS - Force Franklin County (0 counties out)
+      // CRITICAL: These are in Fairfield/Licking County per Google, but WE treat as Franklin
       'groveport',
       'new albany',
       'pickerington',
@@ -216,52 +245,26 @@ export async function checkFranklinCountyStatus(pickupAddress, destinationAddres
       'lockbourne'
     ];
 
-    // Known Non-Franklin County patterns (for Lancaster, OH bug fix) - EXACT MATCH with web app (6 patterns)
-    const nonFranklinCountyPatterns = [
-      'lancaster, oh',
-      'lancaster,oh',
-      'lancaster ohio',
-      '43130', // Lancaster, OH zip code
-      'fairfield county', // Lancaster is in Fairfield County
-      'fairfield co'
-    ];
-
     const isPickupFranklin = franklinCountyPatterns.some(pattern => pickup.includes(pattern));
     const isDestinationFranklin = franklinCountyPatterns.some(pattern => destination.includes(pattern));
 
-    // Special check for Lancaster, OH (Fairfield County) - should NOT be Franklin County
-    const isPickupLancaster = nonFranklinCountyPatterns.some(pattern => pickup.includes(pattern));
-    const isDestinationLancaster = nonFranklinCountyPatterns.some(pattern => destination.includes(pattern));
-
-    // Lancaster, OH bug fix: Force non-Franklin status for Lancaster
-    if (isPickupLancaster || isDestinationLancaster) {
-      console.log('🚨 LANCASTER BUG FIX APPLIED: Lancaster, OH detected as non-Franklin County');
-      return {
-        isInFranklinCounty: false,
-        countiesOut: 2, // Lancaster is 2+ counties out, triggers $4/mile + $50 surcharge
-        pickup: isPickupLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County',
-        destination: isDestinationLancaster ? 'Fairfield County (Lancaster)' : 'Franklin County'
-      };
-    }
-
     if (isPickupFranklin && isDestinationFranklin) {
-      console.log('🚨 EMERGENCY FIX APPLIED: Both addresses detected as Franklin County');
+      console.log('✅ FRANKLIN COUNTY OVERRIDE APPLIED: Both addresses → 0 counties out, $3/mile');
       return {
         isInFranklinCounty: true,
         countiesOut: 0,
-        pickup: 'Franklin County',
-        destination: 'Franklin County'
+        pickup: 'Franklin County (Override)',
+        destination: 'Franklin County (Override)'
       };
     }
 
-    // If no overrides match, return null to indicate we should use Google API
-    // But for mobile app, we'll default to Franklin County to avoid overcharging
+    // PRIORITY 3: No pattern matched - default to Franklin County to avoid overcharging
     console.log('⚠️ No override matched - defaulting to Franklin County');
     return {
       isInFranklinCounty: true,
       countiesOut: 0,
-      pickup: 'Franklin County',
-      destination: 'Franklin County'
+      pickup: 'Franklin County (Default)',
+      destination: 'Franklin County (Default)'
     };
   } catch (error) {
     console.error('County detection error:', error);
@@ -405,7 +408,10 @@ export function calculateTripPrice({
     countyPrice: 0,
     deadMileagePrice: 0,
     weekendAfterHoursSurcharge: 0,
+    weekendSurcharge: 0,          // For PricingDisplay
+    afterHoursSurcharge: 0,       // For PricingDisplay
     emergencyFee: 0,
+    emergencySurcharge: 0,        // For PricingDisplay
     holidaySurcharge: 0,
     wheelchairPrice: 0,
     veteranDiscount: 0,
@@ -415,7 +421,9 @@ export function calculateTripPrice({
     hasDeadMileage: false,
     // Add properties for PricingDisplay component
     legs: isRoundTrip ? 2 : 1,
-    baseRatePerLeg: 0
+    baseRatePerLeg: 0,
+    tripDistancePrice: 0,         // Alias for distancePrice
+    countySurcharge: 0            // Alias for countyPrice
   };
 
   // Enhanced base rate: Regular vs Bariatric
@@ -454,11 +462,13 @@ export function calculateTripPrice({
     } else {
       breakdown.distancePrice = effectiveDistance * PRICING_CONFIG.DISTANCE.OUTSIDE_FRANKLIN;
     }
+    breakdown.tripDistancePrice = breakdown.distancePrice; // Alias for PricingDisplay
   }
 
   // County surcharge for trips outside Franklin County (2+ counties)
   if (countyInfo && countyInfo.countiesOut >= 2) {
     breakdown.countyPrice = (countyInfo.countiesOut - 1) * PRICING_CONFIG.PREMIUMS.COUNTY_SURCHARGE;
+    breakdown.countySurcharge = breakdown.countyPrice; // Alias for PricingDisplay
     console.log('💵 County Surcharge Applied:', {
       countiesOut: countyInfo.countiesOut,
       countyPrice: breakdown.countyPrice
@@ -475,19 +485,36 @@ export function calculateTripPrice({
     });
   }
 
-  // Combined weekend and after-hours premium
+  // Weekend and after-hours premium ($40 total, not per condition)
   if (pickupDateTime) {
     const isAfterHoursTime = isAfterHours(pickupDateTime);
     const isWeekendTime = isWeekend(pickupDateTime);
 
     if (isAfterHoursTime || isWeekendTime) {
-      breakdown.weekendAfterHoursSurcharge = PRICING_CONFIG.PREMIUMS.WEEKEND_AFTER_HOURS;
+      const surcharge = PRICING_CONFIG.PREMIUMS.WEEKEND_AFTER_HOURS;
+
+      // For PricingDisplay: show which condition triggered it
+      if (isWeekendTime && isAfterHoursTime) {
+        // Both apply - show as combined
+        breakdown.weekendSurcharge = surcharge;
+        breakdown.afterHoursSurcharge = 0; // Don't double charge
+      } else if (isWeekendTime) {
+        breakdown.weekendSurcharge = surcharge;
+        breakdown.afterHoursSurcharge = 0;
+      } else {
+        breakdown.weekendSurcharge = 0;
+        breakdown.afterHoursSurcharge = surcharge;
+      }
+
+      // Combined field for facility_app compatibility
+      breakdown.weekendAfterHoursSurcharge = surcharge;
     }
   }
 
   // Emergency fee
   if (isEmergency) {
     breakdown.emergencyFee = PRICING_CONFIG.PREMIUMS.EMERGENCY;
+    breakdown.emergencySurcharge = PRICING_CONFIG.PREMIUMS.EMERGENCY; // For PricingDisplay
   }
 
   // Holiday surcharge (total trip, not per leg)
