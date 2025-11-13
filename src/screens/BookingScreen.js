@@ -578,6 +578,15 @@ const BookingScreen = ({ navigation }) => {
                   }
 
                   const leg = fastestRoute.legs[0];
+                  const distanceInMiles = leg.distance.value * 0.000621371; // meters to miles
+                  const durationText = leg.duration.text;
+
+                  console.log(`🎯 Selected fastest route:`, {
+                    distance: leg.distance.text,
+                    duration: durationText,
+                    miles: distanceInMiles.toFixed(2),
+                    summary: fastestRoute.summary || 'No summary'
+                  });
 
                   // CRITICAL FIX: Update marker coordinates to match route start/end locations
                   const routeStartCoords = {
@@ -595,10 +604,55 @@ const BookingScreen = ({ navigation }) => {
 
                   setPickupCoords(routeStartCoords);
                   setDestinationCoords(routeEndCoords);
+
+                  // Calculate pricing with exact distance from Google Directions API
+                  const pricingResult = await getPricingEstimate({
+                    pickupAddress,
+                    destinationAddress,
+                    isRoundTrip,
+                    pickupDateTime: pickupDate,
+                    clientWeight: weight,
+                    isEmergency,
+                    isVeteran,
+                    distance: Math.round(distanceInMiles * 100) / 100, // Pass distance here!
+                  });
+
+                  if (pricingResult.success && pricingResult.pricing) {
+                    console.log('💰 Complete pricing breakdown:', pricingResult.pricing);
+                    setEstimatedPrice({
+                      finalPrice: pricingResult.pricing.total,
+                      distance: distanceInMiles,
+                      breakdown: pricingResult.pricing
+                    });
+                    setPricingBreakdown(pricingResult.pricing);
+                    setPricingResult(pricingResult);
+                  }
                 }
               } catch (error) {
                 console.error('❌ Google Directions API error (marker positioning):', error);
-                // Keep original coordinates on error
+                // Fallback to MapViewDirections result for distance
+                const distanceInMiles = result.distance * 0.621371;
+
+                const pricingResult = await getPricingEstimate({
+                  pickupAddress,
+                  destinationAddress,
+                  isRoundTrip,
+                  pickupDateTime: pickupDate,
+                  clientWeight: weight,
+                  isEmergency,
+                  isVeteran,
+                  distance: distanceInMiles,
+                });
+
+                if (pricingResult.success && pricingResult.pricing) {
+                  setEstimatedPrice({
+                    finalPrice: pricingResult.pricing.total,
+                    distance: distanceInMiles,
+                    breakdown: pricingResult.pricing
+                  });
+                  setPricingBreakdown(pricingResult.pricing);
+                  setPricingResult(pricingResult);
+                }
               }
             }}
           />
