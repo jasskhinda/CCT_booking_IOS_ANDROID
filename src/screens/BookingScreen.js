@@ -79,73 +79,21 @@ const BookingScreen = ({ navigation }) => {
     fetchPaymentMethods();
   }, []);
 
-  // Auto-calculate price when required fields change - USING NEW PRICING LOGIC
+  // DISABLED: Auto-calculate price without distance
+  // Pricing is now ONLY calculated in map onReady handler with actual route distance
+  // This matches facility_mobile behavior and ensures distance charge is always included
+  /*
   useEffect(() => {
     const autoCalculatePrice = async () => {
-      // Check if all required fields are filled
       if (!pickupAddress || !destinationAddress || !clientWeight) {
         setEstimatedPrice(null);
         setPricingBreakdown(null);
         return;
       }
 
-      const weight = parseFloat(clientWeight);
-      if (weight < 50 || weight > 1000) {
-        setEstimatedPrice(null);
-        setPricingBreakdown(null);
-        return;
-      }
-
-      setCalculating(true);
-      try {
-        console.log('🚀 Mobile: Using NEW pricing calculation');
-        
-        // Use NEW pricing calculation
-        const pricingResult = await getPricingEstimate({
-          pickupAddress,
-          destinationAddress,
-          isRoundTrip,
-          pickupDateTime: pickupDate,
-          clientWeight: weight,
-          isEmergency,
-          isVeteran,
-        });
-        
-        if (pricingResult.success && pricingResult.pricing) {
-          console.log('💰 Mobile: Complete pricing breakdown:', pricingResult.pricing);
-          setEstimatedPrice({
-            finalPrice: pricingResult.pricing.total,
-            distance: pricingResult.distanceInfo?.distance || 0,
-            breakdown: pricingResult.pricing
-          });
-          setPricingBreakdown(pricingResult.pricing);
-          setPricingResult(pricingResult); // Store complete result with distanceInfo
-        } else {
-          console.error('❌ Mobile: Error calculating pricing:', pricingResult.error);
-          // Fallback to old calculation
-          const price = await calculateEnhancedTripPrice({
-            pickupAddress,
-            destinationAddress,
-            pickupDate,
-            isRoundTrip,
-            wheelchairType,
-            clientProvidesWheelchair,
-            isVeteran,
-            isEmergency,
-            clientWeight: weight,
-          });
-          setEstimatedPrice(price);
-          setPricingBreakdown(null);
-          setPricingResult(null);
-        }
-      } catch (error) {
-        console.error('Error calculating price:', error);
-        setEstimatedPrice(null);
-        setPricingBreakdown(null);
-        setPricingResult(null);
-      } finally {
-        setCalculating(false);
-      }
+      // PROBLEM: This calculates pricing WITHOUT distance from map route
+      // Result: Shows wrong price (e.g., $90 instead of $159.09)
+      // Solution: Wait for map to calculate route, then price with actual distance
     };
 
     autoCalculatePrice();
@@ -160,6 +108,7 @@ const BookingScreen = ({ navigation }) => {
     isEmergency,
     clientWeight,
   ]);
+  */
 
   const fetchProfile = async () => {
     try {
