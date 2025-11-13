@@ -79,24 +79,27 @@ const BookingScreen = ({ navigation }) => {
     fetchPaymentMethods();
   }, []);
 
-  // DISABLED: Auto-calculate price without distance
-  // Pricing is now ONLY calculated in map onReady handler with actual route distance
-  // This matches facility_mobile behavior and ensures distance charge is always included
-  /*
+  // Clear pricing when addresses change - pricing will be recalculated by map onReady
   useEffect(() => {
-    const autoCalculatePrice = async () => {
-      if (!pickupAddress || !destinationAddress || !clientWeight) {
-        setEstimatedPrice(null);
-        setPricingBreakdown(null);
-        return;
-      }
+    // Clear pricing when fields are incomplete
+    if (!pickupAddress || !destinationAddress || !clientWeight) {
+      setEstimatedPrice(null);
+      setPricingBreakdown(null);
+      setPricingResult(null);
+      return;
+    }
 
-      // PROBLEM: This calculates pricing WITHOUT distance from map route
-      // Result: Shows wrong price (e.g., $90 instead of $159.09)
-      // Solution: Wait for map to calculate route, then price with actual distance
-    };
+    const weight = parseFloat(clientWeight);
+    if (weight < 50 || weight > 1000) {
+      setEstimatedPrice(null);
+      setPricingBreakdown(null);
+      setPricingResult(null);
+      return;
+    }
 
-    autoCalculatePrice();
+    // Show loading state - pricing will be calculated by map onReady handler
+    setCalculating(true);
+    console.log('⏳ Waiting for map to calculate route and pricing...');
   }, [
     pickupAddress,
     destinationAddress,
@@ -108,7 +111,6 @@ const BookingScreen = ({ navigation }) => {
     isEmergency,
     clientWeight,
   ]);
-  */
 
   const fetchProfile = async () => {
     try {
@@ -575,6 +577,7 @@ const BookingScreen = ({ navigation }) => {
                     });
                     setPricingBreakdown(pricingResult.pricing);
                     setPricingResult(pricingResult);
+                    setCalculating(false); // Clear loading state
                   }
                 }
               } catch (error) {
@@ -601,6 +604,7 @@ const BookingScreen = ({ navigation }) => {
                   });
                   setPricingBreakdown(pricingResult.pricing);
                   setPricingResult(pricingResult);
+                  setCalculating(false); // Clear loading state
                 }
               }
             }}
