@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Component } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ import { useAuth } from '../hooks/useAuth'; // Get current logged-in user
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-export default function UberLikeBookingScreen({ route }) {
+function UberLikeBookingScreen({ route }) {
   const mapRef = useRef(null);
   const navigation = useNavigation();
   const { user } = useAuth(); // Get current logged-in user
@@ -151,11 +151,12 @@ export default function UberLikeBookingScreen({ route }) {
   };
 
   // Recalculate pricing when options change - Use comprehensive pricing
+  // Recalculate pricing when trip options change (but NOT when distance changes - map handles that)
   useEffect(() => {
     if (distanceMiles > 0 && pickupAddress && destinationAddress) {
       recalculatePricing();
     }
-  }, [isRoundTrip, wheelchairType, pickupDate, distanceMiles, isEmergency, clientWeight, pickupAddress, destinationAddress]);
+  }, [isRoundTrip, wheelchairType, pickupDate, isEmergency, clientWeight]);
 
   // Auto-update return time to sensible default when pickup time or duration changes
   useEffect(() => {
@@ -178,9 +179,7 @@ export default function UberLikeBookingScreen({ route }) {
 
   const recalculatePricing = async () => {
     try {
-      // distanceMiles stores ONE-WAY distance, double it for round trips
-      const distanceForPricing = isRoundTrip ? distanceMiles * 2 : distanceMiles;
-      
+      // IMPORTANT: Pass ONE-WAY distance only - pricing.js handles round trip doubling
       const pricingResult = await getPricingEstimate({
         pickupAddress,
         destinationAddress,
@@ -188,7 +187,7 @@ export default function UberLikeBookingScreen({ route }) {
         pickupDateTime: pickupDate.toISOString(),
         wheelchairType,
         isEmergency,
-        preCalculatedDistance: distanceForPricing,
+        distance: distanceMiles,
         clientWeight: clientWeight ? parseInt(clientWeight) : null,
       });
 
@@ -431,10 +430,25 @@ export default function UberLikeBookingScreen({ route }) {
         specialRequirementsArray.push(`Additional passengers: ${additionalPassengers}`);
       }
       if (wheelchairType === 'provided') {
-        if (wheelchairRequirements) specialRequirementsArray.push(`Wheelchair: ${wheelchairRequirements}`);
+        // Format wheelchair requirements object into readable text
+        if (wheelchairRequirements && typeof wheelchairRequirements === 'object') {
+          const reqList = [];
+          if (wheelchairRequirements.stepStool) reqList.push('Step stool');
+          if (wheelchairRequirements.smallerRamp) reqList.push('Smaller ramp');
+          if (wheelchairRequirements.largerRamp) reqList.push('Larger ramp');
+          if (wheelchairRequirements.widerVehicle) reqList.push('Wider vehicle');
+          if (wheelchairRequirements.bariatricRamp) reqList.push('Bariatric ramp');
+          if (reqList.length > 0) {
+            specialRequirementsArray.push(`Wheelchair: CCT Provided (${reqList.join(', ')})`);
+          } else {
+            specialRequirementsArray.push('Wheelchair: CCT Provided');
+          }
+        } else {
+          specialRequirementsArray.push('Wheelchair: CCT Provided');
+        }
         if (wheelchairDetails) specialRequirementsArray.push(wheelchairDetails);
       }
-      
+
       const specialRequirements = specialRequirementsArray.length > 0
         ? specialRequirementsArray.join(' | ')
         : null;
@@ -590,7 +604,7 @@ export default function UberLikeBookingScreen({ route }) {
             destination={destinationCoords}
             apikey={GOOGLE_MAPS_API_KEY}
             strokeWidth={4}
-            strokeColor="#7CCFD0"
+            strokeColor="#2196F3"
             onReady={async (result) => {
               fitMapToRoute(pickupCoords, destinationCoords);
 
@@ -638,23 +652,18 @@ export default function UberLikeBookingScreen({ route }) {
                     summary: fastestRoute.summary || 'No summary'
                   });
 
-                  // Store the ONE-WAY distance (for display purposes)
+                  // Store the ONE-WAY distance (pricing.js will handle round trip doubling)
                   const oneWayDistance = Math.round(distanceInMiles * 100) / 100;
                   setDistanceMiles(oneWayDistance);
                   setEstimatedDuration(durationText);
 
-                  // For round trips, double the distance before pricing calculation
-                  // This matches facility_app behavior (line 685 in facility_app/lib/pricing.js)
-                  const distanceForPricing = isRoundTrip ? oneWayDistance * 2 : oneWayDistance;
-
-                  console.log(`📏 Distance calculation:`, {
+                  console.log(`📏 Distance from map:`, {
                     oneWayMiles: oneWayDistance,
-                    isRoundTrip,
-                    distanceForPricing,
-                    calculation: isRoundTrip ? `${oneWayDistance} * 2 = ${distanceForPricing}` : oneWayDistance
+                    isRoundTrip
                   });
 
                   // Calculate comprehensive pricing with county detection and all fees
+                  // IMPORTANT: Pass ONE-WAY distance only - pricing.js handles round trip doubling
                   const pricingResult = await getPricingEstimate({
                     pickupAddress,
                     destinationAddress,
@@ -662,7 +671,7 @@ export default function UberLikeBookingScreen({ route }) {
                     pickupDateTime: pickupDate.toISOString(),
                     wheelchairType,
                     isEmergency,
-                    preCalculatedDistance: distanceForPricing,
+                    distance: oneWayDistance,
                     clientWeight: clientWeight ? parseInt(clientWeight) : null,
                   });
 
@@ -1236,10 +1245,10 @@ export default function UberLikeBookingScreen({ route }) {
                   {pricingBreakdown.basePrice !== undefined && !isNaN(pricingBreakdown.basePrice) && (
                     <View style={styles.breakdownRow}>
                       <Text style={styles.breakdownLabel}>
-                        Base fare ({isRoundTrip ? '2' : '1'} leg{isRoundTrip ? 's' : ''} @ ${pricingBreakdown.baseRatePerLeg || (pricingBreakdown.isBariatric ? 150 : 50)}/leg{pricingBreakdown.isBariatric ? ' (Bariatric)' : ''})
+                        Base fare ({isRoundTrip ? '2' : '1'} leg{isRoundTrip ? 's' : ''} @ ${pricingBreakdown.baseRatePerLeg || (pricingBreakdown.isBariatric ? 150 : 50)}/leg{pricingBreakdown.isBariatric ? ' (Bariatric rate)' : ''})
                       </Text>
                       <Text style={styles.breakdownValue}>
-                        {formatCurrency(pricingBreakdown.basePrice)}
+                        {formatCurrency(pricingBreakdown.basePrice + (pricingBreakdown.roundTripPrice || 0))}
                       </Text>
                     </View>
                   )}
@@ -2377,4 +2386,54 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
+
+// Error Boundary for Android crash prevention
+class BookingScreenErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('BookingScreen Error Boundary caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#fff' }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 10, textAlign: 'center' }}>
+            Unable to Load Booking Screen
+          </Text>
+          <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 }}>
+            {Platform.OS === 'android'
+              ? 'There was an error loading the booking screen. This may be due to Google Maps initialization.'
+              : 'There was an error loading the booking screen.'}
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: '#5fbfc0', padding: 15, borderRadius: 8 }}
+            onPress={() => this.setState({ hasError: false, error: null })}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Wrap component with error boundary
+export default function UberLikeBookingScreenWrapper(props) {
+  return (
+    <BookingScreenErrorBoundary>
+      <UberLikeBookingScreen {...props} />
+    </BookingScreenErrorBoundary>
+  );
+}
 

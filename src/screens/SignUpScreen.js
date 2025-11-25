@@ -22,8 +22,8 @@ const SignUpScreen = ({ navigation }) => {
   const { signUp } = useAuth();
 
   const handleSignUp = async () => {
-    if (!fullName || !email || !phone || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!fullName || !email || !password || !confirmPassword) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -42,13 +42,19 @@ const SignUpScreen = ({ navigation }) => {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Sign Up Failed', error.message);
+      // Handle specific error cases
+      if (error.message?.includes('already registered')) {
+        Alert.alert('Error', 'This email is already registered. Please sign in instead.');
+      } else {
+        Alert.alert('Sign Up Failed', error.message);
+      }
     } else {
       Alert.alert(
         'Success',
-        'Account created successfully! Please check your email to verify your account.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+        'Account created successfully! Welcome to CCT Booking.',
+        [{ text: 'OK' }]
       );
+      // User will be automatically logged in and redirected to the home screen
     }
   };
 
@@ -83,7 +89,7 @@ const SignUpScreen = ({ navigation }) => {
 
             <TextInput
               style={styles.input}
-              placeholder="Phone Number"
+              placeholder="Phone Number (Optional)"
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
@@ -96,6 +102,10 @@ const SignUpScreen = ({ navigation }) => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="newPassword"
+              passwordRules="minlength: 6;"
               editable={!loading}
             />
 
@@ -105,6 +115,9 @@ const SignUpScreen = ({ navigation }) => {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="newPassword"
               editable={!loading}
             />
 

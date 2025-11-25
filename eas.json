@@ -1,0 +1,38 @@
+{
+  "cli": {
+    "version": ">= 16.26.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://auth.book.compassionatecaretransportation.com",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0emZnYXN1Z2t5Y2JhdmN3dm54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2MzcwOTIsImV4cCI6MjA2MDIxMzA5Mn0.FQtQXKvkBLVtmCqShLyg_y9EDPrufyWQnbD8EE25zSU",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDylwCsypHOs6T9e-JnTA7AoqOMrc3hbhE",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Q41FbHPC9CAw0cIgYQpF487dRuXGZcviBJA0qNlxFWUIofLlt6hOTfVVjPIMLVORdd12XUw7BAu4Gl1B9gfpupb00OAy2mJ4k"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://auth.book.compassionatecaretransportation.com",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0emZnYXN1Z2t5Y2JhdmN3dm54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2MzcwOTIsImV4cCI6MjA2MDIxMzA5Mn0.FQtQXKvkBLVtmCqShLyg_y9EDPrufyWQnbD8EE25zSU",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDylwCsypHOs6T9e-JnTA7AoqOMrc3hbhE",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51Q41FbHPC9CAw0cIgYQpF487dRuXGZcviBJA0qNlxFWUIofLlt6hOTfVVjPIMLVORdd12XUw7BAu4Gl1B9gfpupb00OAy2mJ4k"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "thatisjass@gmail.com",
+        "ascAppId": "6720743926",
+        "appleTeamId": "4U272DP588"
+      }
+    }
+  }
+}

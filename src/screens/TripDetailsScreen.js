@@ -11,11 +11,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import AppHeader from '../components/AppHeader';
+import EditTripModal from '../components/EditTripModal';
 
 const TripDetailsScreen = ({ route, navigation }) => {
   const { tripId } = route.params;
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     fetchTripDetails();
@@ -225,13 +227,39 @@ const TripDetailsScreen = ({ route, navigation }) => {
         {trip.special_requirements && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Additional Notes</Text>
-            <Text style={styles.notesText}>{trip.special_requirements}</Text>
+            <Text style={styles.notesText}>
+              {typeof trip.special_requirements === 'string'
+                ? trip.special_requirements
+                : typeof trip.special_requirements === 'object'
+                  ? (() => {
+                      // Parse the object and format it nicely
+                      const reqs = trip.special_requirements;
+                      let parts = [];
+
+                      if (reqs.additionalPassengers) {
+                        parts.push(`Additional passengers: ${reqs.additionalPassengers}`);
+                      }
+                      if (reqs.wheelchair) {
+                        const wheelchairType = typeof reqs.wheelchair === 'object'
+                          ? (reqs.wheelchair.type === 'provided' ? 'CCT Provided' : reqs.wheelchair.type)
+                          : (reqs.wheelchair === 'provided' ? 'CCT Provided' : reqs.wheelchair);
+                        parts.push(`Wheelchair: ${wheelchairType}`);
+                      }
+                      if (reqs.notes) {
+                        parts.push(reqs.notes);
+                      }
+
+                      return parts.length > 0 ? parts.join(' | ') : 'No special requirements';
+                    })()
+                  : 'No special requirements'
+              }
+            </Text>
           </View>
         )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Trip Information</Text>
-          
+
           {/* Distance */}
           {trip.distance > 0 && (
             <View style={styles.priceRow}>
@@ -241,14 +269,24 @@ const TripDetailsScreen = ({ route, navigation }) => {
           )}
 
           {/* Wheelchair */}
-          {trip.wheelchair_type && trip.wheelchair_type !== 'no_wheelchair' && trip.wheelchair_type !== 'none' && (
+          {trip.wheelchair_type && typeof trip.wheelchair_type === 'string' && trip.wheelchair_type !== 'no_wheelchair' && trip.wheelchair_type !== 'none' && (
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Wheelchair:</Text>
               <Text style={styles.priceValue}>
-                {trip.wheelchair_type === 'provided' ? 'CCT Provided' : 
+                {trip.wheelchair_type === 'provided' ? 'CCT Provided' :
                  trip.wheelchair_type === 'manual' ? 'Manual' :
-                 trip.wheelchair_type === 'power' ? 'Power' : 
-                 'Required'}
+                 trip.wheelchair_type === 'power' ? 'Power' :
+                 trip.wheelchair_type}
+              </Text>
+            </View>
+          )}
+
+          {/* Additional Passengers */}
+          {trip.pricing_breakdown_data?.summary?.additionalPassengers > 0 && (
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Additional Passengers:</Text>
+              <Text style={styles.priceValue}>
+                {trip.pricing_breakdown_data.summary.additionalPassengers}
               </Text>
             </View>
           )}
@@ -283,10 +321,10 @@ const TripDetailsScreen = ({ route, navigation }) => {
                     Base fare ({trip.pricing_breakdown_data.pricing.legs || 1} leg
                     {(trip.pricing_breakdown_data.pricing.legs || 1) > 1 ? 's' : ''} @ $
                     {trip.pricing_breakdown_data.pricing.baseRatePerLeg || 50}/leg
-                    {trip.pricing_breakdown_data.pricing.isBariatric ? ' (Bariatric)' : ''})
+                    {trip.pricing_breakdown_data.pricing.isBariatric ? ' (Bariatric rate)' : ''})
                   </Text>
                   <Text style={styles.priceValue}>
-                    ${trip.pricing_breakdown_data.pricing.basePrice.toFixed(2)}
+                    ${(trip.pricing_breakdown_data.pricing.basePrice + (trip.pricing_breakdown_data.pricing.roundTripPrice || 0)).toFixed(2)}
                   </Text>
                 </View>
               )}
@@ -357,12 +395,12 @@ const TripDetailsScreen = ({ route, navigation }) => {
                 </View>
               )}
 
-              {/* Emergency Surcharge */}
-              {trip.pricing_breakdown_data.pricing.emergencySurcharge > 0 && (
+              {/* Emergency Fee */}
+              {(trip.pricing_breakdown_data.pricing.emergencySurcharge > 0 || trip.pricing_breakdown_data.pricing.emergencyFee > 0) && (
                 <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>Emergency surcharge</Text>
+                  <Text style={styles.priceLabel}>Emergency fee</Text>
                   <Text style={styles.priceValue}>
-                    ${trip.pricing_breakdown_data.pricing.emergencySurcharge.toFixed(2)}
+                    ${(trip.pricing_breakdown_data.pricing.emergencySurcharge || trip.pricing_breakdown_data.pricing.emergencyFee || 0).toFixed(2)}
                   </Text>
                 </View>
               )}
@@ -430,29 +468,109 @@ const TripDetailsScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {trip.wheelchair_type && (
+        {trip.wheelchair_type && trip.wheelchair_type !== 'no_wheelchair' && trip.wheelchair_type !== 'none' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Special Requirements</Text>
+            <Text style={styles.sectionTitle}>Wheelchair Requirements</Text>
+
+            {/* Wheelchair Type */}
             <View style={styles.requirementItem}>
               <Text style={styles.requirementIcon}>♿</Text>
-              <Text style={styles.requirementText}>Wheelchair Accessible Vehicle</Text>
+              <Text style={styles.requirementText}>
+                {trip.wheelchair_type === 'provided' ? 'CCT Provided Wheelchair' :
+                 trip.wheelchair_type === 'manual' ? 'Manual Wheelchair' :
+                 trip.wheelchair_type === 'power' ? 'Power Wheelchair' :
+                 'Wheelchair Required'}
+              </Text>
             </View>
-            {!trip.client_provides_wheelchair && (
+
+            {/* Wheelchair Specific Requirements from pricing_breakdown_data */}
+            {trip.pricing_breakdown_data?.wheelchairInfo?.requirements && (
+              <>
+                {trip.pricing_breakdown_data.wheelchairInfo.requirements.stepStool && (
+                  <View style={styles.requirementItem}>
+                    <Text style={styles.requirementIcon}>🪜</Text>
+                    <Text style={styles.requirementText}>Step stool needed</Text>
+                  </View>
+                )}
+                {trip.pricing_breakdown_data.wheelchairInfo.requirements.smallerRamp && (
+                  <View style={styles.requirementItem}>
+                    <Text style={styles.requirementIcon}>📐</Text>
+                    <Text style={styles.requirementText}>Smaller ramp</Text>
+                  </View>
+                )}
+                {trip.pricing_breakdown_data.wheelchairInfo.requirements.largerRamp && (
+                  <View style={styles.requirementItem}>
+                    <Text style={styles.requirementIcon}>📏</Text>
+                    <Text style={styles.requirementText}>Larger ramp</Text>
+                  </View>
+                )}
+                {trip.pricing_breakdown_data.wheelchairInfo.requirements.widerVehicle && (
+                  <View style={styles.requirementItem}>
+                    <Text style={styles.requirementIcon}>🚐</Text>
+                    <Text style={styles.requirementText}>Wider vehicle needed</Text>
+                  </View>
+                )}
+                {trip.pricing_breakdown_data.wheelchairInfo.requirements.bariatricRamp && (
+                  <View style={styles.requirementItem}>
+                    <Text style={styles.requirementIcon}>💪</Text>
+                    <Text style={styles.requirementText}>Bariatric ramp</Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Wheelchair Details/Notes */}
+            {trip.pricing_breakdown_data?.wheelchairInfo?.details && (
               <View style={styles.requirementItem}>
-                <Text style={styles.requirementIcon}>🦽</Text>
-                <Text style={styles.requirementText}>Wheelchair Rental Provided</Text>
+                <Text style={styles.requirementIcon}>📝</Text>
+                <Text style={styles.requirementText}>
+                  {trip.pricing_breakdown_data.wheelchairInfo.details}
+                </Text>
               </View>
             )}
           </View>
         )}
 
-        {trip.status === 'pending' && (
-          <TouchableOpacity style={styles.cancelButton} onPress={handleCancelTrip}>
-            <Text style={styles.cancelButtonText}>Cancel Trip</Text>
-          </TouchableOpacity>
+        {/* Dispatcher Notice for Non-Pending Trips */}
+        {trip.status !== 'pending' && trip.status !== 'cancelled' && (
+          <View style={styles.approvedNotice}>
+            <Text style={styles.approvedNoticeIcon}>ℹ️</Text>
+            <Text style={styles.approvedNoticeText}>
+              This trip has been approved. To make any changes or cancel this trip, please contact our dispatchers immediately for assistance.
+            </Text>
+          </View>
         )}
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          {/* Edit Trip Button - Only for pending trips */}
+          {trip.status === 'pending' && (
+            <TouchableOpacity style={styles.editButton} onPress={() => setShowEditModal(true)}>
+              <Text style={styles.editButtonText}>✏️ Edit Trip</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Cancel Trip Button - Only for pending trips */}
+          {trip.status === 'pending' && (
+            <TouchableOpacity style={styles.cancelButton} onPress={handleCancelTrip}>
+              <Text style={styles.cancelButtonText}>Cancel Trip</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </ScrollView>
+
+      {/* Edit Trip Modal */}
+      <EditTripModal
+        visible={showEditModal}
+        trip={trip}
+        onClose={() => setShowEditModal(false)}
+        onSave={(updatedTrip) => {
+          setTrip(updatedTrip);
+          setShowEditModal(false);
+          fetchTripDetails(); // Reload trip details after edit
+        }}
+      />
     </View>
   );
 };
@@ -669,12 +787,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  approvedNotice: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  approvedNoticeIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  approvedNoticeText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1565C0',
+    lineHeight: 20,
+  },
+  actionButtons: {
+    paddingHorizontal: 0,
+    marginTop: 8,
+  },
+  editButton: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   cancelButton: {
     backgroundColor: '#E74C3C',
     borderRadius: 8,
     padding: 18,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 0,
     marginBottom: 20,
   },
   cancelButtonText: {

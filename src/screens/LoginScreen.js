@@ -60,6 +60,9 @@ const LoginScreen = ({ navigation }) => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="password"
               editable={!loading}
             />
 

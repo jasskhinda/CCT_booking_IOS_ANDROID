@@ -322,64 +322,58 @@ function extractCountyFromGeocode(result) {
  */
 export async function calculateDeadMileage(pickupAddress) {
   try {
-    const API_URL = process.env.EXPO_PUBLIC_API_URL;
-    const officeAddress = '5050 Blazer Pkwy # 100, Dublin, OH 43017';
+    const officeAddress = PRICING_CONFIG.COMPANY_OFFICE.ADDRESS;
 
     console.log('🚗 Calculating dead mileage from office to pickup');
-    console.log('🔑 API_URL:', API_URL || '❌ NOT SET');
     console.log('🏢 Office:', officeAddress);
     console.log('📍 Pickup:', pickupAddress);
 
-    if (!API_URL) {
-      console.error('❌ API_URL not configured - cannot calculate dead mileage');
-      return { distance: 0, isEstimated: true };
-    }
-
-    // Use the Distance Matrix API endpoint with timeout (matches web app)
+    // Use Google Maps Distance Matrix API directly (same as facility_app)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
     try {
-      const apiEndpoint = `${API_URL}/api/maps/distancematrix?origin=${encodeURIComponent(officeAddress)}&destination=${encodeURIComponent(pickupAddress)}`;
-      console.log('🌐 Calling API:', apiEndpoint);
+      const distanceMatrixUrl = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(officeAddress)}&destinations=${encodeURIComponent(pickupAddress)}&mode=driving&units=imperial&key=${GOOGLE_MAPS_API_KEY}`;
 
-      const response = await fetch(apiEndpoint, { signal: controller.signal });
+      const response = await fetch(distanceMatrixUrl, { signal: controller.signal });
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        console.error('Dead mileage API error:', response.status);
+        console.error('❌ Dead mileage API error:', response.status);
         return { distance: 0, isEstimated: true };
       }
 
       const data = await response.json();
 
-      console.log('🚗 Dead mileage API response:', JSON.stringify(data).substring(0, 200));
+      if (data.status === 'OK' && data.rows && data.rows[0] && data.rows[0].elements && data.rows[0].elements[0]) {
+        const element = data.rows[0].elements[0];
 
-      if (data.status === 'OK' && data.distance) {
-        // Parse Distance Matrix API response format (same as web app)
-        const distanceInMiles = data.distance.value * 0.000621371; // Convert meters to miles
-        console.log('🚗 Dead mileage calculated:', distanceInMiles.toFixed(2), 'miles');
+        if (element.status === 'OK' && element.distance) {
+          // Distance Matrix API returns distance in meters
+          const distanceInMiles = element.distance.value * 0.000621371; // Convert meters to miles
+          console.log('✅ Dead mileage calculated:', distanceInMiles.toFixed(2), 'miles');
 
-        return {
-          distance: Math.round(distanceInMiles * 100) / 100,
-          isEstimated: false
-        };
-      } else {
-        console.warn('Dead mileage calculation failed, response:', data);
-        return { distance: 0, isEstimated: true };
+          return {
+            distance: Math.round(distanceInMiles * 100) / 100,
+            isEstimated: false
+          };
+        }
       }
+
+      console.warn('⚠️ Dead mileage calculation failed, response:', data.status);
+      return { distance: 0, isEstimated: true };
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.log('⏱️ Distance calculation timed out - using estimated distance');
+        console.log('⏱️ Dead mileage calculation timed out');
       } else {
-        console.log('⚠️ Distance calculation unavailable - using estimated distance');
+        console.error('❌ Dead mileage calculation error:', fetchError.message);
       }
       return { distance: 0, isEstimated: true };
     }
   } catch (error) {
-    console.log('⚠️ Unable to calculate distance - using estimated distance');
+    console.error('❌ Unable to calculate dead mileage:', error.message);
     return { distance: 0, isEstimated: true };
   }
 }
@@ -430,6 +424,14 @@ export function calculateTripPrice({
   const isBariatric = clientWeight && clientWeight >= PRICING_CONFIG.BARIATRIC.WEIGHT_THRESHOLD;
   breakdown.isBariatric = isBariatric;
 
+  console.log('💰 Base Rate Calculation:', {
+    clientWeight,
+    isBariatric,
+    isRoundTrip,
+    bariatricRate: PRICING_CONFIG.BASE_RATES.BARIATRIC_PER_LEG,
+    regularRate: PRICING_CONFIG.BASE_RATES.REGULAR_PER_LEG
+  });
+
   if (isBariatric) {
     breakdown.baseRatePerLeg = PRICING_CONFIG.BASE_RATES.BARIATRIC_PER_LEG;
     breakdown.basePrice = PRICING_CONFIG.BASE_RATES.BARIATRIC_PER_LEG;
@@ -443,6 +445,12 @@ export function calculateTripPrice({
       breakdown.roundTripPrice = PRICING_CONFIG.BASE_RATES.REGULAR_PER_LEG;
     }
   }
+
+  console.log('💰 Base Prices Set:', {
+    basePrice: breakdown.basePrice,
+    roundTripPrice: breakdown.roundTripPrice,
+    total: breakdown.basePrice + breakdown.roundTripPrice
+  });
 
   // Distance charge calculation with Franklin County logic
   if (distance > 0) {
@@ -490,6 +498,15 @@ export function calculateTripPrice({
     const isAfterHoursTime = isAfterHours(pickupDateTime);
     const isWeekendTime = isWeekend(pickupDateTime);
 
+    console.log('💰 Weekend/After-Hours Check:', {
+      pickupDateTime,
+      dateObj: new Date(pickupDateTime),
+      day: new Date(pickupDateTime).getDay(),
+      hour: new Date(pickupDateTime).getHours(),
+      isWeekendTime,
+      isAfterHoursTime
+    });
+
     if (isAfterHoursTime || isWeekendTime) {
       const surcharge = PRICING_CONFIG.PREMIUMS.WEEKEND_AFTER_HOURS;
 
@@ -508,6 +525,14 @@ export function calculateTripPrice({
 
       // Combined field for facility_app compatibility
       breakdown.weekendAfterHoursSurcharge = surcharge;
+
+      console.log('💰 Weekend/After-Hours Surcharge Applied:', {
+        weekendSurcharge: breakdown.weekendSurcharge,
+        afterHoursSurcharge: breakdown.afterHoursSurcharge,
+        total: breakdown.weekendAfterHoursSurcharge
+      });
+    } else {
+      console.log('💰 No Weekend/After-Hours Surcharge (regular hours)');
     }
   }
 
@@ -665,6 +690,7 @@ export async function getPricingEstimate({
       pricing,
       countyInfo,
       deadMileage,
+      deadMileageDistance: deadMileage, // Alias for screen component
       holidayInfo,
       summary: {
         tripType: isRoundTrip ? 'Round Trip' : 'One Way',

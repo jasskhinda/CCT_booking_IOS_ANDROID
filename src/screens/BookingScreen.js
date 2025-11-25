@@ -557,19 +557,29 @@ const BookingScreen = ({ navigation }) => {
                   setDestinationCoords(routeEndCoords);
 
                   // Calculate pricing with exact distance from Google Directions API
+                  console.log('🔍 DEBUG - onReady handler called');
+                  console.log('🔍 clientWeight state:', clientWeight);
+                  console.log('🔍 distanceInMiles:', distanceInMiles);
+                  console.log('🔍 isRoundTrip:', isRoundTrip);
+                  console.log('🔍 isEmergency:', isEmergency);
+
                   const pricingResult = await getPricingEstimate({
                     pickupAddress,
                     destinationAddress,
                     isRoundTrip,
                     pickupDateTime: pickupDate,
-                    clientWeight: weight,
+                    clientWeight: clientWeight ? parseFloat(clientWeight) : null,
                     isEmergency,
                     isVeteran,
                     distance: Math.round(distanceInMiles * 100) / 100, // Pass distance here!
                   });
 
+                  console.log('🔍 Pricing result:', JSON.stringify(pricingResult, null, 2));
+
                   if (pricingResult.success && pricingResult.pricing) {
                     console.log('💰 Complete pricing breakdown:', pricingResult.pricing);
+                    console.log('💰 Distance price:', pricingResult.pricing.distancePrice);
+                    console.log('💰 Total:', pricingResult.pricing.total);
                     setEstimatedPrice({
                       finalPrice: pricingResult.pricing.total,
                       distance: distanceInMiles,
@@ -578,6 +588,8 @@ const BookingScreen = ({ navigation }) => {
                     setPricingBreakdown(pricingResult.pricing);
                     setPricingResult(pricingResult);
                     setCalculating(false); // Clear loading state
+                  } else {
+                    console.error('❌ Pricing calculation failed:', pricingResult);
                   }
                 }
               } catch (error) {
@@ -590,7 +602,7 @@ const BookingScreen = ({ navigation }) => {
                   destinationAddress,
                   isRoundTrip,
                   pickupDateTime: pickupDate,
-                  clientWeight: weight,
+                  clientWeight: clientWeight ? parseFloat(clientWeight) : null,
                   isEmergency,
                   isVeteran,
                   distance: distanceInMiles,

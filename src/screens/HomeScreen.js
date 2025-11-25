@@ -27,11 +27,20 @@ const HomeScreen = ({ navigation }) => {
           .eq('id', user.id)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // If profile doesn't exist (deleted account), don't log error
+          if (error.code !== 'PGRST116') {
+            console.error('Error fetching profile:', error);
+          }
+          return;
+        }
         setProfile(data);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      // Only log errors that aren't about deleted profiles
+      if (error.code !== 'PGRST116') {
+        console.error('Error fetching profile:', error);
+      }
     } finally {
       setLoading(false);
     }

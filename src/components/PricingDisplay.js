@@ -19,6 +19,15 @@ const PricingDisplay = ({
   // Handle both old and new pricing structure with safe number conversion
   const total = getNumber(pricing.total || pricing.finalPrice);
   const basePrice = getNumber(pricing.basePrice);
+  const roundTripPrice = getNumber(pricing.roundTripPrice);
+  const totalBasePrice = basePrice + roundTripPrice; // Total base fare (includes round trip if applicable)
+
+  console.log('🔍 PricingDisplay received:', {
+    basePrice,
+    roundTripPrice,
+    totalBasePrice,
+    pricingObject: pricing
+  });
   const baseRatePerLeg = getNumber(pricing.baseRatePerLeg) || 50;
   const legs = getNumber(pricing.legs) || 1;
   const isBariatric = pricing.isBariatric || false;
@@ -71,7 +80,7 @@ const PricingDisplay = ({
           <Text style={styles.breakdownLabel}>
             Base fare ({legs} leg{legs > 1 ? 's' : ''} @ ${baseRatePerLeg.toFixed(0)}/leg{isBariatric ? ' (Bariatric rate)' : ''})
           </Text>
-          <Text style={styles.breakdownValue}>${basePrice.toFixed(2)}</Text>
+          <Text style={styles.breakdownValue}>${totalBasePrice.toFixed(2)}</Text>
         </View>
 
         {/* Distance charge with detailed calculation */}
@@ -128,10 +137,10 @@ const PricingDisplay = ({
           </View>
         )}
 
-        {/* Emergency surcharge */}
+        {/* Emergency fee */}
         {emergencySurcharge > 0 && (
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Emergency surcharge</Text>
+            <Text style={styles.breakdownLabel}>Emergency fee</Text>
             <Text style={styles.breakdownValue}>${emergencySurcharge.toFixed(2)}</Text>
           </View>
         )}

@@ -9,21 +9,24 @@
     "scheme": "cctbooking",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icononload.png",
       "resizeMode": "contain",
       "backgroundColor": "#5fbfc0"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cct.booking",
-      "buildNumber": "1",
+      "bundleIdentifier": "com.compassionatecare.bookingportal",
+      "buildNumber": "20",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
-        ]
+        ],
+        "NSLocationWhenInUseUsageDescription": "CCT Booking needs access to your location to automatically set pickup addresses, display routes on the map, and calculate accurate transportation fares when booking trips.",
+        "NSCameraUsageDescription": "The app uses the camera to scan payment cards for faster checkout (optional feature provided by payment processor)."
       },
       "config": {
-        "googleMapsApiKey": "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY"
+        "usesNonExemptEncryption": false,
+        "googleMapsApiKey": "AIzaSyDylwCsypHOs6T9e-JnTA7AoqOMrc3hbhE"
       }
     },
     "android": {
@@ -31,7 +34,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#5fbfc0"
       },
-      "package": "com.cct.booking",
+      "edgeToEdgeEnabled": false,
+      "package": "com.compassionatecare.bookingportal",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -42,12 +46,8 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY"
+          "apiKey": "AIzaSyDylwCsypHOs6T9e-JnTA7AoqOMrc3hbhE"
         }
-      },
-      "notification": {
-        "icon": "./assets/notification.png",
-        "color": "#5fbfc0"
       }
     },
     "web": {
@@ -58,15 +58,15 @@
         "expo-notifications",
         {
           "icon": "./assets/notification.png",
-          "color": "#5fbfc0",
-          "sounds": ["./assets/notification-sound.wav"]
+          "color": "#5fbfc0"
         }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "3f623a81-8d54-483d-9907-b34694de64cf"
       }
-    }
+    },
+    "owner": "jass_khinda"
   }
 }

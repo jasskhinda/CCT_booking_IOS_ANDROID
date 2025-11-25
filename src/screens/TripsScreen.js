@@ -72,7 +72,7 @@ const TripsScreen = ({ navigation }) => {
         .from('trips')
         .select('*')
         .eq('user_id', user.id)
-        .order('pickup_time', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
@@ -287,7 +287,7 @@ const TripsScreen = ({ navigation }) => {
 
         <TouchableOpacity
           style={styles.bookTripButton}
-          onPress={() => navigation.navigate('Booking')}
+          onPress={() => navigation.navigate('Book')}
         >
           <Text style={styles.bookIcon}>📅</Text>
           <Text style={styles.bookTripText}>Book Trip</Text>

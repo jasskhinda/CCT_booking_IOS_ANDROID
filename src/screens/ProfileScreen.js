@@ -39,7 +39,14 @@ const ProfileScreen = ({ navigation }) => {
         .eq('id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) {
+        // If profile doesn't exist (deleted account), don't show error
+        if (error.code !== 'PGRST116') {
+          throw error;
+        }
+        // Profile deleted - just return without setting data
+        return;
+      }
 
       if (data) {
         setProfile({
@@ -53,15 +60,18 @@ const ProfileScreen = ({ navigation }) => {
         });
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      Alert.alert('Error', 'Failed to load profile');
+      // Only log errors that aren't about deleted profiles
+      if (error.code !== 'PGRST116') {
+        console.error('❌ Error loading profile:', error);
+        Alert.alert('Error', 'Failed to load profile');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!profile.full_name || !profile.phone) {
+    if (!profile.full_name) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
@@ -123,6 +133,52 @@ const ProfileScreen = ({ navigation }) => {
     );
   };
 
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to permanently delete your account? This action cannot be undone.\n\nAll your data including:\n• Personal information\n• Trip history\n• Payment methods\n\nwill be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Delete user data while keeping trips as records
+
+              // 1. Delete payment methods (if you have a payment_methods table)
+              const { error: paymentError } = await supabase
+                .from('payment_methods')
+                .delete()
+                .eq('user_id', user.id);
+
+              if (paymentError) console.warn('Error deleting payment methods:', paymentError);
+
+              // 2. Delete profile (trips will remain but reference to deleted user)
+              const { error: profileError } = await supabase
+                .from('profiles')
+                .delete()
+                .eq('id', user.id);
+
+              if (profileError) throw profileError;
+
+              // 3. Sign out the user
+              await signOut();
+
+              Alert.alert(
+                'Account Deleted',
+                'Your account and personal information have been permanently deleted.'
+              );
+            } catch (error) {
+              console.error('Error deleting account:', error);
+              Alert.alert('Error', 'Failed to delete account. Please contact support at j.khinda@ccgrhc.com');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -154,10 +210,10 @@ const ProfileScreen = ({ navigation }) => {
             onChangeText={(text) => setProfile({ ...profile, full_name: text })}
           />
 
-          <Text style={styles.label}>Phone Number *</Text>
+          <Text style={styles.label}>Phone Number</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter your phone number"
+            placeholder="Enter your phone number (optional)"
             value={profile.phone}
             onChangeText={(text) => setProfile({ ...profile, phone: text })}
             keyboardType="phone-pad"
@@ -271,6 +327,10 @@ const ProfileScreen = ({ navigation }) => {
 
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <Text style={styles.signOutButtonText}>Sign Out</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
+          <Text style={styles.deleteAccountButtonText}>Delete Account</Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
@@ -459,10 +519,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 18,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
   },
   signOutButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  deleteAccountButton: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 18,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#E74C3C',
+  },
+  deleteAccountButtonText: {
+    color: '#E74C3C',
     fontSize: 16,
     fontWeight: 'bold',
   },

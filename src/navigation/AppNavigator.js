@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
+import { useNotifications } from '../hooks/useNotifications';
+import { supabase } from '../lib/supabase';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -34,26 +37,46 @@ const AuthStack = () => (
   </Stack.Navigator>
 );
 
-const HomeTabs = () => (
-  <Tab.Navigator
-    screenOptions={{
-      headerShown: false,
-      tabBarActiveTintColor: BRAND_COLOR,
-      tabBarInactiveTintColor: INACTIVE_COLOR,
-      tabBarStyle: {
-        backgroundColor: '#ffffff',
-        borderTopColor: '#e0e0e0',
-        borderTopWidth: 1,
-        paddingBottom: 5,
-        paddingTop: 5,
-        height: 60,
-      },
-      tabBarLabelStyle: {
-        fontSize: 12,
-        fontWeight: '600',
-      },
-    }}
-  >
+const HomeTabs = () => {
+  const [userId, setUserId] = useState(null);
+  const insets = useSafeAreaInsets();
+
+  // Set up push notifications (will auto-skip if userId is null)
+  useNotifications(userId);
+
+  useEffect(() => {
+    // Get current user ID for notifications
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        console.log('👤 Setting userId for notifications:', user.id);
+        setUserId(user.id);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: BRAND_COLOR,
+        tabBarInactiveTintColor: INACTIVE_COLOR,
+        tabBarStyle: {
+          backgroundColor: '#ffffff',
+          borderTopColor: '#e0e0e0',
+          borderTopWidth: 1,
+          paddingBottom: insets.bottom,
+          paddingTop: 5,
+          height: 60 + insets.bottom,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
+      }}
+    >
     <Tab.Screen
       name="Home"
       component={HomeScreen}
@@ -111,7 +134,8 @@ const HomeTabs = () => (
       }}
     />
   </Tab.Navigator>
-);
+  );
+};
 
 const AppStack = () => (
   <Stack.Navigator>

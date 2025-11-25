@@ -59,10 +59,18 @@ export const AuthProvider = ({ children }) => {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If profile doesn't exist (code PGRST116), it's likely deleted - don't log error
+        if (error.code !== 'PGRST116') {
+          console.error('Error fetching user profile:', error);
+        }
+        return;
+      }
       setUserProfile(data);
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      if (error.code !== 'PGRST116') {
+        console.error('Error fetching user profile:', error);
+      }
     }
   };
 
@@ -73,6 +81,22 @@ export const AuthProvider = ({ children }) => {
         password,
       });
       if (error) throw error;
+
+      // Check if user profile exists (account might be deleted)
+      if (data.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError && profileError.code === 'PGRST116') {
+          // Profile doesn't exist - account was deleted
+          await supabase.auth.signOut();
+          throw new Error('This account has been deleted. Please create a new account.');
+        }
+      }
+
       return { data, error: null };
     } catch (error) {
       return { data: null, error };
@@ -85,32 +109,54 @@ export const AuthProvider = ({ children }) => {
         email,
         password,
         options: {
+          emailRedirectTo: undefined, // Disable email confirmation for mobile app
           data: {
             full_name: fullName,
-            phone: phone,
+            ...(phone && { phone: phone }), // Only include if provided
           },
         },
       });
 
-      if (authError) throw authError;
+      // If there's an email error but user was created, treat as success
+      if (authError) {
+        // Check if user was actually created despite email error
+        if (authError.message?.includes('confirmation email') && authData?.user) {
+          console.log('⚠️ Email error but user created:', authData.user.id);
+          // Continue to create profile
+        } else {
+          throw authError;
+        }
+      }
 
-      // Create profile with client role
+      // Create profile with client role (phone is stored in user metadata, not profiles table)
       if (authData.user) {
+        // Split full name into first and last name
+        const nameParts = fullName.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
         const { error: profileError } = await supabase
           .from('profiles')
           .insert([
             {
               id: authData.user.id,
               email: email,
-              full_name: fullName,
-              phone: phone,
+              first_name: firstName,
+              last_name: lastName,
+              ...(phone && { phone_number: phone }), // Only include if provided
               role: 'client',
             },
           ]);
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          // If profile already exists, that's okay
+          if (!profileError.message?.includes('duplicate key')) {
+            throw profileError;
+          }
+        }
       }
 
+      // Return success even if there was an email error
       return { data: authData, error: null };
     } catch (error) {
       return { data: null, error };
