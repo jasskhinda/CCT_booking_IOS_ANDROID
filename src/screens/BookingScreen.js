@@ -432,6 +432,30 @@ const BookingScreen = ({ navigation }) => {
 
       if (error) throw error;
 
+      // Send push notification to dispatchers via OneSignal
+      try {
+        const dispatcherApiUrl = 'https://dispatcher.compassionatecaretransportation.com/api/notifications/send-dispatcher-push';
+        await fetch(dispatcherApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tripId: data.id,
+            action: 'new',
+            source: 'booking_app',
+            tripDetails: {
+              pickup_address: data.pickup_address,
+              destination_address: data.destination_address,
+            },
+          }),
+        });
+        console.log('📱 Dispatcher push notification sent');
+      } catch (pushError) {
+        console.error('Error sending dispatcher push notification:', pushError);
+        // Don't fail the booking if push notification fails
+      }
+
       Alert.alert(
         'Booking Submitted!',
         'Your trip request has been submitted for approval. You will be notified once approved. Payment will only be processed after trip completion.',
