@@ -8,7 +8,13 @@ import {
   scheduleLocalNotification,
   getTripNotificationMessage,
   saveNotificationToHistory,
+  initializeOneSignal,
+  loginOneSignal,
+  logoutOneSignal,
 } from '../services/notifications';
+
+// Initialize OneSignal when module loads
+initializeOneSignal();
 
 export function useNotifications(userId) {
   const notificationListener = useRef();
@@ -16,14 +22,19 @@ export function useNotifications(userId) {
   const tripSubscription = useRef(null);
 
   useEffect(() => {
-    console.log('🔔 useNotifications hook called with userId:', userId);
+    console.log('useNotifications hook called with userId:', userId);
 
     if (!userId) {
-      console.log('⚠️ Missing userId, not setting up notifications');
+      console.log('Missing userId, not setting up notifications');
+      // Logout from OneSignal when user logs out
+      logoutOneSignal();
       return;
     }
 
-    console.log('✅ Setting up notifications for user:', userId);
+    console.log('Setting up notifications for user:', userId);
+
+    // Login to OneSignal with user ID
+    loginOneSignal(userId);
 
     // Register for push notifications
     registerPushNotifications();
@@ -50,23 +61,22 @@ export function useNotifications(userId) {
 
   const registerPushNotifications = async () => {
     try {
-      console.log('📱 Registering push notifications...');
-      console.log('🔑 EAS_PROJECT_ID:', process.env.EXPO_PUBLIC_EAS_PROJECT_ID ? '✅ SET' : '❌ NOT SET');
+      console.log('Registering push notifications...');
 
       const token = await registerForPushNotificationsAsync();
-      console.log('🔑 Full push token received:', token);
+      console.log('Push token received:', token);
 
-      if (token && token !== 'LOCAL_NOTIFICATIONS_ONLY') {
+      // Only save non-OneSignal tokens to database (for backwards compatibility)
+      if (token && token !== 'LOCAL_NOTIFICATIONS_ONLY' && token !== 'ONESIGNAL_MANAGED') {
         await savePushToken(userId, token);
-        console.log('💾 Push token saved to database');
-      } else if (token === 'LOCAL_NOTIFICATIONS_ONLY') {
-        console.log('⚠️ LOCAL_NOTIFICATIONS_ONLY - push notifications when app is closed will NOT work');
-        console.log('⚠️ Real-time notifications when app is open WILL work');
+        console.log('Push token saved to database');
+      } else if (token === 'ONESIGNAL_MANAGED') {
+        console.log('Push notifications managed by OneSignal');
       } else {
-        console.log('⚠️ No push token received - local notifications will still work');
+        console.log('No push token received - local notifications will still work');
       }
     } catch (error) {
-      console.error('❌ Error registering push notifications:', error);
+      console.error('Error registering push notifications:', error);
     }
   };
 

@@ -9,6 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@babel/runtime": "^7.28.4",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "^8.4.4",
     "@react-native-picker/picker": "^2.11.4",
@@ -19,10 +20,12 @@
     "@supabase/supabase-js": "^2.78.0",
     "buffer": "^6.0.3",
     "expo": "~54.0.20",
+    "expo-constants": "^18.0.10",
     "expo-device": "^8.0.9",
     "expo-notifications": "^0.32.12",
     "expo-secure-store": "^15.0.7",
     "expo-status-bar": "~3.0.8",
+    "onesignal-expo-plugin": "^2.0.3",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-calendars": "^1.1313.0",
@@ -30,6 +33,7 @@
     "react-native-get-random-values": "~1.11.0",
     "react-native-maps": "^1.20.1",
     "react-native-maps-directions": "^1.9.0",
+    "react-native-onesignal": "^5.2.14",
     "react-native-safe-area-context": "^5.6.2",
     "react-native-screens": "~4.16.0"
   },

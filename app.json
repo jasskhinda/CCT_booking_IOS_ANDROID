@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "cctbooking",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/icononload.png",
       "resizeMode": "contain",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.compassionatecare.bookingportal",
-      "buildNumber": "20",
+      "buildNumber": "21",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
@@ -60,10 +60,34 @@
           "icon": "./assets/notification.png",
           "color": "#5fbfc0"
         }
+      ],
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "development"
+        }
       ]
     ],
     "extra": {
+      "oneSignalAppId": "ae7b0431-a892-437f-81ed-dda534b3d57d",
       "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "OneSignalNotificationServiceExtension",
+                  "bundleIdentifier": "com.compassionatecare.bookingportal.OneSignalNotificationServiceExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.compassionatecare.bookingportal.onesignal"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
         "projectId": "3f623a81-8d54-483d-9907-b34694de64cf"
       }
     },

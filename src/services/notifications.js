@@ -2,8 +2,9 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
+import OneSignalService from '../../services/onesignalService';
 
-// Configure notification handler
+// Configure notification handler (for local notifications)
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -11,6 +12,33 @@ Notifications.setNotificationHandler({
     shouldSetBadge: true,
   }),
 });
+
+// Initialize OneSignal - call this at app startup
+export function initializeOneSignal() {
+  OneSignalService.initialize();
+}
+
+// Login to OneSignal with user ID
+export function loginOneSignal(userId) {
+  if (userId) {
+    OneSignalService.login(userId);
+    OneSignalService.addTags({
+      user_id: userId,
+      app_type: 'booking',
+      role: 'client'
+    });
+  }
+}
+
+// Logout from OneSignal
+export function logoutOneSignal() {
+  OneSignalService.logout();
+}
+
+// Get OneSignal player ID
+export async function getOneSignalPlayerId() {
+  return await OneSignalService.getPlayerId();
+}
 
 // Request notification permissions
 export async function registerForPushNotificationsAsync() {
@@ -35,29 +63,28 @@ export async function registerForPushNotificationsAsync() {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('⚠️ Notification permissions not granted');
+      console.log('Notification permissions not granted');
       return null;
     }
 
-    console.log('✅ Notification permissions granted');
+    console.log('Notification permissions granted');
 
-    // Try to get Expo push token, but don't fail if projectId is missing
-    // Local notifications will still work without it
+    // OneSignal handles push tokens automatically
+    // We still try to get Expo token for backwards compatibility
     try {
       const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
-      if (!projectId) {
-        console.log('⚠️ EAS Project ID not configured - push notifications will be limited to local only');
-        console.log('ℹ️ See PUSH_NOTIFICATIONS_SETUP.md for full setup instructions');
+      if (projectId) {
+        token = (await Notifications.getExpoPushTokenAsync({
+          projectId: projectId,
+        })).data;
+        console.log('Expo push token:', token);
+      } else {
+        // OneSignal will handle push notifications
+        token = 'ONESIGNAL_MANAGED';
       }
-      token = (await Notifications.getExpoPushTokenAsync({
-        projectId: projectId,
-      })).data;
-      console.log('✅ Expo push token:', token);
     } catch (error) {
-      console.log('⚠️ Could not get Expo push token (this is OK for local notifications):', error.message);
-      console.log('ℹ️ To enable remote push notifications, see PUSH_NOTIFICATIONS_SETUP.md');
-      // Return a placeholder to indicate permissions are granted but no remote push
-      token = 'LOCAL_NOTIFICATIONS_ONLY';
+      console.log('Could not get Expo push token, OneSignal will handle push:', error.message);
+      token = 'ONESIGNAL_MANAGED';
     }
   } else {
     console.log('Must use physical device for Push Notifications');
