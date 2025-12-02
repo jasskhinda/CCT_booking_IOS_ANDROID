@@ -87,6 +87,30 @@ const TripDetailsScreen = ({ route, navigation }) => {
 
               if (error) throw error;
 
+              // Send push notification to dispatchers about cancellation
+              try {
+                console.log('📱 Sending dispatcher notification for cancellation...');
+                const response = await fetch('https://dispatch.compassionatecaretransportation.com/api/notifications/send-dispatcher-push', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    tripId: tripId,
+                    action: 'cancelled',
+                    source: 'booking_mobile',
+                    tripDetails: {
+                      pickup_address: trip?.pickup_address,
+                    },
+                  }),
+                });
+                if (response.ok) {
+                  console.log('✅ Dispatcher cancellation notification sent');
+                } else {
+                  console.error('❌ Dispatcher notification failed:', await response.text());
+                }
+              } catch (notifError) {
+                console.error('❌ Error sending dispatcher notification:', notifError);
+              }
+
               Alert.alert('Success', 'Trip cancelled successfully');
               navigation.goBack();
             } catch (error) {

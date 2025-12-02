@@ -36,7 +36,16 @@ class OneSignalService {
       return;
     }
     console.log('OneSignal login with user ID:', userId);
+
+    // First attempt immediately
     OneSignal.login(userId);
+
+    // Retry after a delay to ensure SDK is fully initialized
+    // This helps with the "blocked by unexecutable request" warning
+    setTimeout(() => {
+      console.log('OneSignal retry login with user ID:', userId);
+      OneSignal.login(userId);
+    }, 3000);
   }
 
   logout() {

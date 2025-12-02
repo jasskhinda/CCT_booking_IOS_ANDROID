@@ -496,11 +496,38 @@ function UberLikeBookingScreen({ route }) {
         pricing_breakdown_locked_at: estimatedFare ? new Date().toISOString() : null
       };
 
-      const { error } = await supabase
+      const { data: insertedTrip, error } = await supabase
         .from('trips')
-        .insert([tripData]);
+        .insert([tripData])
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Send push notification to dispatchers about new trip
+      try {
+        console.log('📱 Sending dispatcher notification for new booking...');
+        const response = await fetch('https://dispatch.compassionatecaretransportation.com/api/notifications/send-dispatcher-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId: insertedTrip.id,
+            action: 'new',
+            source: 'booking_mobile',
+            tripDetails: {
+              pickup_address: fullPickupAddress,
+              client_name: profile ? `${profile.first_name} ${profile.last_name}` : 'Client'
+            },
+          }),
+        });
+        if (response.ok) {
+          console.log('✅ Dispatcher notification sent');
+        } else {
+          console.error('❌ Dispatcher notification failed:', await response.text());
+        }
+      } catch (notifError) {
+        console.error('❌ Error sending dispatcher notification:', notifError);
+      }
 
       Alert.alert('Success', 'Trip booked successfully!', [
         {
