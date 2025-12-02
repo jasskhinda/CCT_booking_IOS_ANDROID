@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "40668746492",
+    "project_id": "cct-booking-noti",
+    "storage_bucket": "cct-booking-noti.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:40668746492:android:80745615e9b2cfbf14fd79",
+        "android_client_info": {
+          "package_name": "com.compassionatecare.bookingportal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8ng8Z4KhvzoI79MxU9Ym5_YjL7sCOiYQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

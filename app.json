@@ -2,7 +2,7 @@
   "expo": {
     "name": "Booking",
     "slug": "cct-booking-mobile",
-    "version": "1.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.compassionatecare.bookingportal",
-      "buildNumber": "21",
+      "buildNumber": "25",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
@@ -64,7 +64,7 @@
       [
         "onesignal-expo-plugin",
         {
-          "mode": "development"
+          "mode": "production"
         }
       ]
     ],
